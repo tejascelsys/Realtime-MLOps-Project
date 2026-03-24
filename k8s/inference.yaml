@@ -7,8 +7,4 @@ spec:
   predictor:
     serviceAccountName: sa-s3-access
     sklearn:
-<<<<<<< HEAD
-      storageUri: s3://churn-model-bucket-cicd-abhi-1/models/churn_model.pkl
-=======
       storageUri: s3://churn-model-bucket-cicd-abhi-1/models/
->>>>>>> a3a10a6 (updated inference.yaml)
