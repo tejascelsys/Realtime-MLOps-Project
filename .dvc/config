@@ -1,0 +1,4 @@
+[core]
+    remote = myremote
+['remote "myremote"']
+    url = s3://churn-model-bucket-cicd-abhi-1/models
