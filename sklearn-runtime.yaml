@@ -1,0 +1,16 @@
+apiVersion: serving.kserve.io/v1alpha1
+kind: ClusterServingRuntime
+metadata:
+  name: sklearn-runtime
+spec:
+  supportedModelFormats:
+    - name: sklearn
+      version: "1"
+      autoSelect: true
+  containers:
+    - name: kserve-container
+      image: churn-kserve:latest
+      args:
+        - --model_name={{.Name}}
+        - --model_dir=/mnt/models
+        - --model_file=churn_model.pkl

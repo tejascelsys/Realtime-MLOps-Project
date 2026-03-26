@@ -1,0 +1,10 @@
+FROM kserve/sklearnserver:v0.11.0
+
+USER root
+
+RUN pip install --no-cache-dir \
+    numpy==1.26.4 \
+    scikit-learn==1.6.1 \
+    joblib
+
+USER 1000
