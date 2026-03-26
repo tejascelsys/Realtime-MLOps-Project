@@ -9,7 +9,7 @@ from sklearn.metrics import accuracy_score, roc_auc_score
 with open('params.yaml', 'r') as f:
     params = yaml.safe_load(f)
 
-# Load data
+# Load data into df
 df = pd.read_csv('data/churn_data.csv')
 
 # Features and target
