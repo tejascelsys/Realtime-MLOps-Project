@@ -35,3 +35,4 @@ with open('models/churn_model.pkl', 'wb') as f:
     pickle.dump(model, f)
 
 print("Model saved to models/churn_model.pkl")
+# Triggered: Thu Mar 26 05:14:52 PM IST 2026
