@@ -81,13 +81,14 @@ python api.py
 # Initialize DVC
 dvc init
 
-# Configure S3 remote
-dvc remote add -d myremote s3://my-bucket/churn-model
+# Configure Azure Blob Storage remote
+dvc remote add -d myremote azure://models-container/models
+dvc remote modify myremote account_name storageaccountmlopspoc
 
 # Track model with DVC
 dvc add models/churn_model.pkl
 
-# Push to S3
+# Push to Azure
 dvc push
 
 # Commit DVC metadata
@@ -95,31 +96,29 @@ git add models/churn_model.pkl.dvc .dvc/ .gitignore
 git commit -m "Track model with DVC"
 ```
 
-### 3. Push Model to S3
+### 3. Push Model to Azure Blob Storage
 
 After training the model and setting up DVC:
 
 ```bash
-# Configure AWS credentials (if not already done)
-export AWS_ACCESS_KEY_ID=your-key
-export AWS_SECRET_ACCESS_KEY=your-secret
-export AWS_DEFAULT_REGION=us-east-1
+# Set your Azure storage connection string environment variable
+export AZURE_STORAGE_CONNECTION_STRING="<YOUR_AZURE_ACCESS_TOKEN_HERE>"
 
-# Create S3 bucket
-aws s3 mb s3://my-bucket
+# Create Azure Blob container
+az storage container create --name models-container --account-name storageaccountmlopspoc
 
-# Push model to S3 using DVC
+# Push model to Azure using DVC
 dvc push
 
-# Verify model is in S3
-aws s3 ls s3://my-bucket/churn-model/models/ --recursive
+# Verify model is in Azure
+az storage blob list --container-name models-container --account-name storageaccountmlopspoc --prefix models/
 ```
 
-The model will be stored in S3 at: `s3://my-bucket/churn-model/models/churn_model.pkl`
+The model will be stored in Azure Blob at: `azure://models-container/models/churn_model.pkl`
 
-### 4. S3 Configuration
+### 4. Azure Configuration
 
-**Note:** This section is already covered in Step 3. S3 is used by DVC to store models.
+**Note:** This section is already covered in Step 3. Azure Blob Storage is used by DVC to store models.
 
 ### 5. Kubernetes with KIND
 
@@ -134,8 +133,8 @@ kind create cluster --name churn-model
 # Install KServe
 kubectl apply -f https://github.com/kserve/kserve/releases/download/v0.11.0/kserve.yaml
 
-# Create namespace, ServiceAccount and S3 secret for KServe
-# Update k8s/serviceaccount.yaml with your AWS credentials first
+# Create namespace, ServiceAccount and Azure secret for KServe
+# Update k8s/serviceaccount.yaml with your Azure connection string first
 kubectl apply -f k8s/serviceaccount.yaml
 
 # Deploy inference service
@@ -148,7 +147,7 @@ kubectl get inferenceservice -n churn-model
 kubectl get inferenceservice churn-predictor -n churn-model -w
 ```
 
-**Important:** Before deploying, update `k8s/serviceaccount.yaml` with your actual AWS credentials.
+**Important:** Before deploying, update `k8s/serviceaccount.yaml` with your actual Azure access token/connection string.
 
 ### 7. Test KServe Inference
 
@@ -182,14 +181,13 @@ Expected response:
 ### 8. GitHub Actions
 
 **Required Secrets:**
-- `AWS_ACCESS_KEY_ID`
-- `AWS_SECRET_ACCESS_KEY`
+- `AZURE_STORAGE_CONNECTION_STRING`
 
 **Pipeline Flow:**
 1. Checkout code
 2. Generate dataset
 3. Train model
-4. Push model to S3 via DVC
+4. Push model to Azure Blob via DVC
 5. Build Docker image
 6. Push image to ECR
 7. Update `inference.yaml` with new image tag
@@ -217,7 +215,7 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.pas
 1. **Developer pushes code** → GitHub
 2. **GitHub Actions triggered:**
    - Trains model
-   - Pushes model to S3 (DVC)
+   - Pushes model to Azure Blob (DVC)
    - Builds Docker image
    - Pushes to ECR
    - Updates `inference.yaml`
@@ -249,8 +247,8 @@ Response:
 
 ## Key Components
 
-- **DVC**: Version control for data and models in S3
-- **S3**: Remote storage for models and data
+- **DVC**: Version control for data and models in Azure Blob
+- **Azure Blob Storage**: Remote storage for models and data
 - **KServe**: Serverless ML inference on Kubernetes
 - **KIND**: Local Kubernetes for testing
 - **GitHub Actions**: CI/CD automation
@@ -260,5 +258,5 @@ Response:
 
 - Replace `your-registry` in YAML files with your actual container registry
 - Replace `your-org` with your GitHub organization
-- Replace `my-bucket` with your S3 bucket name
+- Replace `your-org` with your GitHub organization
 - This is a minimal demo - production setups require monitoring, logging, and security hardening

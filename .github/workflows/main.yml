@@ -6,8 +6,8 @@ on:
   workflow_dispatch:
 
 env:
-  AWS_REGION: eu-north-1
-  S3_BUCKET: churn-model-bucket-cicd-abhi-1
+  AZURE_STORAGE_ACCOUNT: storageaccountmlopspoc
+  AZURE_STORAGE_CONTAINER: models-container
 
 jobs:
   train-and-deploy:
@@ -36,21 +36,19 @@ jobs:
     - name: Train model
       run: python train.py
     
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ env.AWS_REGION }}
-    
-    - name: Push model to S3 directly
+    - name: Push model to Azure Blob directly
       run: |
-        aws s3 cp models/churn_model.pkl s3://churn-model-bucket-cicd-abhi-1/models/churn_model.pkl
-        echo "Model pushed to S3 is success"
+        az storage blob upload \
+          --account-name ${{ env.AZURE_STORAGE_ACCOUNT }} \
+          --container-name ${{ env.AZURE_STORAGE_CONTAINER }} \
+          --file models/churn_model.pkl \
+          --name models/churn_model.pkl \
+          --connection-string "${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}"
+        echo "Model pushed to Azure Blob successfully"
     
-    - name: Update inference.yaml with S3 model path
+    - name: Update inference.yaml with Azure model path
       run: |
-        MODEL_URI="s3://churn-model-bucket-cicd-abhi-1/models/churn_model.pkl"
+        MODEL_URI="azure://${{ env.AZURE_STORAGE_CONTAINER }}/models/churn_model.pkl"
         sed -i "s|storageUri: .*|storageUri: $MODEL_URI|g" k8s/inference.yaml
     
     - name: Commit updated inference.yaml
@@ -58,5 +56,5 @@ jobs:
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
         git add k8s/inference.yaml
-        git commit -m "Update model S3 path [skip ci]" || echo "No changes"
+        git commit -m "Update model Azure Blob path [skip ci]" || echo "No changes"
         git push || echo "No changes to push"

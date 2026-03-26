@@ -5,8 +5,8 @@ metadata:
   namespace: churn-model
 spec:
   predictor:
-    serviceAccountName: sa-s3-access
+    serviceAccountName: sa-az-access
     model:
       modelFormat:
         name: sklearn
-      storageUri: s3://churn-model-bucket-cicd-abhi-1/models/churn_model.pkl
+      storageUri: azure://models-container/models/
