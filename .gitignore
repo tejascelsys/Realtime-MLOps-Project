@@ -1,3 +1,4 @@
+port-forward*.log
 *.log
 *.pyc
 __pycache__/
