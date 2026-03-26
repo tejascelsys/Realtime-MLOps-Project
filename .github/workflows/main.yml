@@ -43,7 +43,8 @@ jobs:
           --container-name ${{ env.AZURE_STORAGE_CONTAINER }} \
           --file models/churn_model.pkl \
           --name models/churn_model.pkl \
-          --connection-string "${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}"
+          --connection-string "${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}" \
+          --overwrite
         echo "Model pushed to Azure Blob successfully"
     
     - name: Update inference.yaml with Azure model path
