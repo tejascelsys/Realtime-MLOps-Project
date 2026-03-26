@@ -49,8 +49,8 @@ jobs:
     
     - name: Update inference.yaml with Azure model path
       run: |
-        MODEL_URI="https://${{ env.AZURE_STORAGE_ACCOUNT }}.blob.core.windows.net/${{ env.AZURE_STORAGE_CONTAINER }}/models/"
-        sed -i "s|storageUri: .*|storageUri: $MODEL_URI|g" k8s/inference.yaml
+        MODEL_URI="https://${{ env.AZURE_STORAGE_ACCOUNT }}.blob.core.windows.net/${{ env.AZURE_STORAGE_CONTAINER }}/models/?${{ secrets.AZURE_STORAGE_SAS_TOKEN }}"
+        sed -i "s|storageUri: .*|storageUri: \"$MODEL_URI\"|g" k8s/inference.yaml
     
     - name: Commit updated inference.yaml
       run: |

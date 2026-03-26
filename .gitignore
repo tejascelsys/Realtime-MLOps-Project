@@ -1,4 +1,4 @@
-
+*.log
 *.pyc
 __pycache__/
 .dvc/cache
