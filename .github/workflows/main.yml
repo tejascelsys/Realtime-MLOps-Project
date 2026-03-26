@@ -30,11 +30,13 @@ jobs:
       run: |
         pip install -r requirements.txt
     
-    - name: Generate dataset
-      run: python generate_data.py
-    
-    - name: Train model
-      run: python train.py
+    - name: Run DVC Pipeline and Push
+      env:
+        AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+      run: |
+        dvc remote modify myremote connection_string "$AZURE_STORAGE_CONNECTION_STRING"
+        dvc repro
+        dvc push
     
     - name: Push model to Azure Blob directly
       run: |
@@ -53,10 +55,10 @@ jobs:
         python3 scripts/update_yaml.py "$MODEL_URI"
         echo "storageUri updated to: $MODEL_URI"
     
-    - name: Commit updated inference.yaml
+    - name: Commit updated files
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add k8s/inference.yaml
-        git commit -m "Update model Azure Blob path [skip ci]" || echo "No changes"
+        git add k8s/inference.yaml dvc.lock metrics.json .dvc/config params.yaml dvc.yaml
+        git commit -m "Update DVC pipeline and model Azure Blob path [skip ci]" || echo "No changes"
         git push || echo "No changes to push"

@@ -1,9 +1,13 @@
-"""Train churn prediction model"""
+import yaml
+import json
 import pandas as pd
 import pickle
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score, roc_auc_score
+
+with open('params.yaml', 'r') as f:
+    params = yaml.safe_load(f)
 
 # Load data
 df = pd.read_csv('data/churn_data.csv')
@@ -14,10 +18,10 @@ X = df[features]
 y = df['churn']
 
 # Split
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=params['train']['test_size'], random_state=params['train']['random_state'])
 
 # Train
-model = RandomForestClassifier(n_estimators=100, random_state=42)
+model = RandomForestClassifier(n_estimators=params['train']['n_estimators'], random_state=params['train']['random_state'])
 model.fit(X_train, y_train)
 
 # Evaluate
@@ -35,4 +39,10 @@ with open('models/churn_model.pkl', 'wb') as f:
     pickle.dump(model, f)
 
 print("Model saved to models/churn_model.pkl")
+
+# Save metrics
+metrics = {"accuracy": accuracy, "auc_roc": auc}
+with open('metrics.json', 'w') as f:
+    json.dump(metrics, f, indent=2)
+print("Metrics saved to metrics.json")
 # Triggered: Thu Mar 26 05:14:52 PM IST 2026

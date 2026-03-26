@@ -1,11 +1,15 @@
 """Generate synthetic churn dataset"""
+import yaml
 import pandas as pd
 import numpy as np
 
-np.random.seed(42)
+with open('params.yaml', 'r') as f:
+    params = yaml.safe_load(f)
 
-# Generate 1000 samples
-n_samples = 1000
+np.random.seed(params['data']['random_seed'])
+
+# Generate samples
+n_samples = params['data']['n_samples']
 
 data = {
     'customer_id': range(1, n_samples + 1),

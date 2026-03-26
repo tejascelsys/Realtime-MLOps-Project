@@ -1,0 +1,25 @@
+stages:
+  generate_data:
+    cmd: python generate_data.py
+    deps:
+      - generate_data.py
+    params:
+      - data.n_samples
+      - data.random_seed
+    outs:
+      - data/churn_data.csv
+
+  train:
+    cmd: python train.py
+    deps:
+      - train.py
+      - data/churn_data.csv
+    params:
+      - train.n_estimators
+      - train.test_size
+      - train.random_state
+    outs:
+      - models/churn_model.pkl
+    metrics:
+      - metrics.json:
+          cache: false

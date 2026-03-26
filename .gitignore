@@ -4,3 +4,5 @@ port-forward*.log
 __pycache__/
 .dvc/cache
 .dvc/tmp
+data/churn_data.csv
+models/churn_model.pkl

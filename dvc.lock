@@ -1,0 +1,43 @@
+schema: '2.0'
+stages:
+  generate_data:
+    cmd: python generate_data.py
+    deps:
+    - path: generate_data.py
+      hash: md5
+      md5: cc9015a6155c51b4f2633a4da315829e
+      size: 1062
+    params:
+      params.yaml:
+        data.n_samples: 1000
+        data.random_seed: 42
+    outs:
+    - path: data/churn_data.csv
+      hash: md5
+      md5: 73df4b94191b29d57362ae4a5b487a53
+      size: 50313
+  train:
+    cmd: python train.py
+    deps:
+    - path: data/churn_data.csv
+      hash: md5
+      md5: 73df4b94191b29d57362ae4a5b487a53
+      size: 50313
+    - path: train.py
+      hash: md5
+      md5: 1598d723ea0a79b18f1a00e6951e2dbc
+      size: 1394
+    params:
+      params.yaml:
+        train.n_estimators: 100
+        train.random_state: 42
+        train.test_size: 0.2
+    outs:
+    - path: metrics.json
+      hash: md5
+      md5: 180c0e804dc1261dd4eea2e99a006703
+      size: 54
+    - path: models/churn_model.pkl
+      hash: md5
+      md5: d4392cef2fb3cecafbb2d5cdec4fc475
+      size: 2683554
