@@ -11,4 +11,4 @@ spec:
     model:
       modelFormat:
         name: sklearn
-      storageUri: "https://storageaccountmlopspoc.blob.core.windows.net/models-container/models/4ed9bcd635e04839d2f88159fe0550dc9075ff96/?sv=2024-11-04&ss=bfqt&srt=co&sp=rwdlacupiytfx&se=2027-03-26T17:48:24Z&st=2026-03-26T09:33:24Z&spr=https,http&sig=uUNN7NbMjCybNsklZnXkwLVLFJvePb%2BAEzmKi%2BpKGSw%3D"
+      storageUri: "https://storageaccountmlopspoc.blob.core.windows.net/models-container/models/98584b77ff8661a858e943e2ff92240d3b6fb57e/?sv=2024-11-04&ss=bfqt&srt=co&sp=rwdlacupiytfx&se=2027-03-26T17:48:24Z&st=2026-03-26T09:33:24Z&spr=https,http&sig=uUNN7NbMjCybNsklZnXkwLVLFJvePb%2BAEzmKi%2BpKGSw%3D"
