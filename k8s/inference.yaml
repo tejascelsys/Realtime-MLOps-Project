@@ -3,12 +3,12 @@ kind: InferenceService
 metadata:
   name: churn-predictor
   namespace: churn-model
+  # storageUri below is injected by GitHub Actions (AZURE_STORAGE_SAS_TOKEN secret).
+  # Do not hardcode the SAS token here. This placeholder gets replaced by CI.
 spec:
   predictor:
     serviceAccountName: sa-az-access
     model:
       modelFormat:
         name: sklearn
-      # storageUri is injected by GitHub Actions from the AZURE_STORAGE_SAS_TOKEN secret.
-      # Do not hardcode the SAS token here.
       storageUri: "https://storageaccountmlopspoc.blob.core.windows.net/models-container/models/PLACEHOLDER_REPLACED_BY_CI"
