@@ -39,5 +39,5 @@ stages:
       size: 54
     - path: models/churn_model.pkl
       hash: md5
-      md5: 38823b46adc9a6774644d16f095c2385
-      size: 2977989
+      md5: d4392cef2fb3cecafbb2d5cdec4fc475
+      size: 2683554

@@ -1,6 +1,8 @@
-# Churn Model MLOps Demo
+# Realtime MLOps Pipeline: Customer Churn Predictor
 
-A demonstration of MLOps practices for a customer churn prediction model, using Azure Blob Storage for model storage, KServe for inference, GitHub Actions for CI/CD, and ArgoCD for GitOps deployment.
+A fully automated, production-grade MLOps demonstration for a customer churn prediction model. This project leverages **Azure Blob Storage** for artifact storage, **DVC** for data and metrics versioning, **GitHub Actions** for CI/CD, **ArgoCD** for GitOps deployments, and **KServe** for serverless ML inference.
+
+---
 
 ## What Does This Model Do?
 
@@ -32,15 +34,28 @@ Imagine you run a telecom company with thousands of customers. Some customers ar
 
 ---
 
-## Project Structure
+## 🚀 Architecture At A Glance
 
-```
+1. **Source of Truth (Git):** Code, hyperparameters (`params.yaml`), and GitOps configurations live here.
+2. **Data Ledger (DVC):** Tracks massive datasets, binaries, and training metrics (`metrics.json`). Artifacts are pushed to Azure Blob Storage using cryptographic hashes.
+3. **Continuous Integration (GitHub Actions):** Automatically runs `dvc repro` on code push, pushes new models to Azure, and updates Kubernetes definitions with the newest model URIs.
+4. **Continuous Deployment (ArgoCD):** Watches the Git repository for updated Kubernetes definitions. Triggers KServe to spin up new endpoints with zero downtime.
+5. **Inference Engine (KServe):** Pulls the binary model securely from Azure via SAS tokens and serves a lightning-fast REST API.
+
+---
+
+## 📁 Project Structure
+
+```text
 churn-model/
+├── params.yaml                   # Centralized Hyperparameters & Data Configs
 ├── generate_data.py              # Generate synthetic churn dataset
 ├── train.py                      # Train the RandomForest model
 ├── api.py                        # FastAPI local inference server
 ├── requirements.txt              # Python dependencies
 ├── Dockerfile                    # Container image for KServe
+├── dvc.yaml & dvc.lock           # DVC pipeline stages and lockfiles
+├── metrics.json                  # Model accuracy and AUC-ROC (Tracked by DVC)
 ├── .dvc/config                   # DVC remote config (Azure Blob)
 ├── models/
 │   └── churn_model.pkl           # Trained model (uploaded to Azure)
@@ -55,7 +70,7 @@ churn-model/
 
 ---
 
-## Prerequisites
+## 🛠 Prerequisites
 
 Before running this project, ensure you have the following ready:
 
@@ -71,14 +86,10 @@ Before running this project, ensure you have the following ready:
 
 ---
 
-## Azure Blob Storage Setup
+## 🔐 Azure Blob & GitHub Secrets Setup
 
-This project uses **Azure Blob Storage** (account: `storageaccountmlopspoc`, container: `models-container`) to store trained models.
-
-### Generate a SAS Token
-
-A SAS (Shared Access Signature) token is required in two places:
-1. **GitHub Actions** — to upload the model blob during CI.
+This project uses **Azure Blob Storage** to store trained models and DVC tracking artifacts. A SAS (Shared Access Signature) token is required in two places:
+1. **GitHub Actions** — to upload the DVC objects and the final model blob during CI.
 2. **KServe** — embedded in the `storageUri` to download the model at inference time.
 
 **Steps to generate a SAS token in the Azure Portal:**
@@ -91,59 +102,54 @@ A SAS (Shared Access Signature) token is required in two places:
 7. Copy the **Connection string** — this is your `AZURE_STORAGE_CONNECTION_STRING`.
 8. Copy the **SAS token** query string (starting with `sv=...`) — this is embedded in `inference.yaml`.
 
+**Required GitHub Repository Secrets:** Add to **Settings → Secrets... → Actions:**
+* `AZURE_STORAGE_CONNECTION_STRING`
+* `AZURE_STORAGE_SAS_TOKEN` (Only the trailing `sv=...` part)
+
 > **Note:** The SAS connection string format looks like:
 > `BlobEndpoint=https://storageaccountmlopspoc.blob.core.windows.net/;...;SharedAccessSignature=sv=...`
 
 ---
 
-## MLOps Pipeline Steps
+## ⚙️ MLOps Pipeline Steps
 
-### 1. Local Setup
+### 1. Local Setup & Testing
 
 ```bash
 # Install dependencies
 pip install -r requirements.txt
 
-# Generate synthetic dataset
-python generate_data.py
-
-# Train model (saves to models/churn_model.pkl)
-python train.py
+# Run DVC to generate synthetic datasets and train the model automatically
+dvc repro
 
 # Test API locally
 python api.py
 # Visit http://localhost:8000/docs
 ```
 
-### 2. GitHub Actions CI/CD
+### 2. 🧪 Local DVC Features (Experiment Tracking)
 
-The pipeline runs automatically on every push to `main`. It:
-1. Generates the dataset
-2. Trains the model
-3. Uploads `models/churn_model.pkl` to Azure Blob Storage (`models-container/models/`)
-4. Updates `k8s/inference.yaml` with the latest storage URI
-5. Commits and pushes the updated YAML (triggers ArgoCD)
+DVC acts as a smart cache and an experiment auditor natively integrated with Git.
 
-**Required GitHub Repository Secret:**
+*   **The Smart Cache:** If you run `dvc repro` twice without changing code/parameters, DVC skips computation (`Data and pipelines are up to date`), saving cloud compute costs.
+*   **The Metrics Diff:** Open `params.yaml`, change the `n_estimators`, and run `dvc repro`. Use `dvc metrics diff` to see instantly how your Accuracy and AUC-ROC shifted before committing to Git!
+*   **The Time Machine:** To restore a bad model state simply `git checkout <old-commit-hash>` followed by `dvc pull` to bring back exact dataset states locally without relying on bulky Git LFS.
 
-| Secret Name | Value |
-|-------------|-------|
-| `AZURE_STORAGE_CONNECTION_STRING` | Full connection string from Azure SAS token generation |
+### 3. GitHub Actions CI/CD
 
-Add it via: **GitHub Repo → Settings → Secrets and variables → Actions → New repository secret**
+The pipeline runs automatically on every push to `main`. It achieves "Invisible MLOps":
+1. Triggers DVC pipeline dynamically reading from Azure Connection Strings
+2. Uploads updated DVC storage chunks safely (Hashes logic)
+3. Uploads `models/churn_model.pkl` explicitly to the Azure Blob KServe path using Git SHAs
+4. Updates `k8s/inference.yaml` securely with the latest storage URI and SAS Token
+5. Commits `dvc.lock`, `metrics.json` and the YAML updates back automatically (triggering ArgoCD).
 
-> **Note:** The pipeline uses `--overwrite` when uploading, so re-runs will always replace the existing blob.
-
-### 3. Kubernetes with KIND (Local Cluster)
+### 4. Kubernetes with KIND (Local Cluster) & KServe
 
 ```bash
 # Create a local KIND cluster
 kind create cluster --name churn-model
-```
 
-### 4. KServe Setup
-
-```bash
 # Install KServe (includes cert-manager, Istio, etc.)
 kubectl apply -f https://github.com/kserve/kserve/releases/download/v0.11.0/kserve.yaml
 
@@ -153,12 +159,7 @@ kubectl wait --for=condition=ready pod -l control-plane=kserve-controller-manage
 
 ### 5. Deploy the Inference Service
 
-**Important:** Before applying, ensure `k8s/inference.yaml` has the correct `storageUri` with a valid SAS token embedded in the URL. The format is:
-```
-https://storageaccountmlopspoc.blob.core.windows.net/models-container/models/?<SAS_QUERY_STRING>
-```
-
-Also ensure `k8s/serviceaccount.yaml` has your valid `AZURE_STORAGE_CONNECTION_STRING` set in the secret (used by GitHub Actions).
+**Important:** Ensure `k8s/inference.yaml` has the correct `storageUri` with a valid SAS token. Also ensure `k8s/serviceaccount.yaml` has your `AZURE_STORAGE_CONNECTION_STRING` injected into Kubernetes secrets.
 
 ```bash
 # Apply namespace, secret, and service account
@@ -169,19 +170,10 @@ kubectl apply -f k8s/inference.yaml
 
 # Watch until READY = True (may take 2-3 minutes)
 kubectl get inferenceservice churn-predictor -n churn-model -w
-
-# Check pods
-kubectl get pods -n churn-model
-
-# If stuck in Init:CrashLoopBackOff, check the storage-initializer logs
-kubectl logs -l serving.kserve.io/inferenceservice=churn-predictor -n churn-model -c storage-initializer
 ```
+> **KServe Azure Authentication Note:** KServe expects the SAS token securely embedded into its generated `storageUri` inside of the `spec`. Make sure your Python pipeline is not double breaking string escaping inside of `inference.yaml`.
 
-> **KServe Azure Authentication Note:** KServe does not natively support `AZURE_STORAGE_CONNECTION_STRING` from a Kubernetes ServiceAccount secret for private blob access. Instead, the SAS token **must be embedded directly in the `storageUri` HTTPS URL** (as implemented in `inference.yaml`). This is the officially supported approach for SAS-based authentication.
-
-> **SAS Token Expiry:** Regenerate your SAS token before it expires and update both `k8s/inference.yaml` (the `storageUri`) and the GitHub Secret `AZURE_STORAGE_CONNECTION_STRING`.
-
-### 6. Test KServe Inference
+### 6. Test KServe Inference Live
 
 ```bash
 # Port-forward the inference service locally
@@ -229,35 +221,38 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.pas
 
 ---
 
-## Complete MLOps Workflow
+## 🔁 Complete MLOps Workflow Trace
 
 ```
-Developer pushes code to GitHub (main branch)
+Developer pushes code/parameters to GitHub (main branch)
         │
         ▼
 GitHub Actions Pipeline
-  ├── Generate dataset
-  ├── Train model (churn_model.pkl)
-  ├── Upload model → Azure Blob Storage (models-container/models/)
-  ├── Update k8s/inference.yaml storageUri
-  └── Commit & push updated YAML
+  ├── Recomputes cached Data Logic (DVC)
+  ├── Retrains model using parameters / metrics (churn_model.pkl)
+  ├── Uploads hashes privately → Azure Blob Storage
+  ├── Uploads raw .pkl securely directly to KServe container
+  ├── Updates k8s/inference.yaml storageUri securely via Python update_yaml.py
+  └── Commits metrics.json and dvc.lock mapping back into Git!
         │
         ▼
-ArgoCD detects change in k8s/inference.yaml
+ArgoCD detects change in tracked k8s/inference.yaml
         │
         ▼
-ArgoCD syncs → applies to Kubernetes
+ArgoCD syncs → applies state to Kubernetes
         │
         ▼
-KServe downloads model from Azure Blob (via SAS URL)
+KServe securely streams model binary from Azure Blob via embedded SAS
         │
         ▼
-KServe serves predictions via REST API
+KServe serves updated predictions via REST API without downtime
 ```
 
 ---
 
-## Local API Usage (FastAPI)
+## Local API Usage (FastAPI `api.py`)
+
+If running isolated code directly:
 
 ```bash
 curl -X POST http://localhost:8000/predict \
@@ -281,7 +276,7 @@ Response:
 
 ---
 
-## Key Components
+## Key Components Summary
 
 | Component | Role |
 |-----------|------|
