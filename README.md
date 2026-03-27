@@ -1,4 +1,4 @@
-# Realtime MLOps Pipeline: Customer Churn Predictor
+# Realtime MLOps Pipeline: Customer Churn Predictor 
 
 A fully automated, production-grade MLOps demonstration for a customer churn prediction model. This project leverages **Azure Blob Storage** for artifact storage, **DVC** for data and metrics versioning, **GitHub Actions** for CI/CD, **ArgoCD** for GitOps deployments, and **KServe** for serverless ML inference.
 

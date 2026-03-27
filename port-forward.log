@@ -1,13 +1,3 @@
 nohup: ignoring input
 Forwarding from 0.0.0.0:8080 -> 8080
 Handling connection for 8080
-Handling connection for 8080
-Handling connection for 8080
-Handling connection for 8080
-Handling connection for 8080
-Handling connection for 8080
-Handling connection for 8080
-Handling connection for 8080
-E0326 20:30:08.598081  620494 portforward.go:413] "Unhandled Error" err="an error occurred forwarding 8080 -> 8080: error forwarding port 8080 to pod 736c81df2846ef7182ceceb8fd206e0fb5efa6e3e8fa668bcc9524c8badb8da1, uid : failed to find sandbox \"736c81df2846ef7182ceceb8fd206e0fb5efa6e3e8fa668bcc9524c8badb8da1\" in store: not found"
-E0326 20:30:08.598081  620494 portforward.go:413] "Unhandled Error" err="an error occurred forwarding 8080 -> 8080: error forwarding port 8080 to pod 736c81df2846ef7182ceceb8fd206e0fb5efa6e3e8fa668bcc9524c8badb8da1, uid : failed to find sandbox \"736c81df2846ef7182ceceb8fd206e0fb5efa6e3e8fa668bcc9524c8badb8da1\" in store: not found"
-error: lost connection to pod
