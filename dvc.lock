@@ -29,15 +29,15 @@ stages:
       size: 1403
     params:
       params.yaml:
-        train.n_estimators: 100
+        train.n_estimators: 300
         train.random_state: 42
         train.test_size: 0.2
     outs:
     - path: metrics.json
       hash: md5
-      md5: 180c0e804dc1261dd4eea2e99a006703
-      size: 54
+      md5: fac74106b5ab59bee5314cc2178d15df
+      size: 55
     - path: models/churn_model.pkl
       hash: md5
-      md5: 38823b46adc9a6774644d16f095c2385
-      size: 2977989
+      md5: c9a20cf59f45203671fe7719fbfce3b2
+      size: 8932243
