@@ -88,26 +88,13 @@ Before running this project, ensure you have the following ready:
 
 ## 🔐 Azure Blob & GitHub Secrets Setup
 
-This project uses **Azure Blob Storage** to store trained models and DVC tracking artifacts. A SAS (Shared Access Signature) token is required in two places:
-1. **GitHub Actions** — to upload the DVC objects and the final model blob during CI.
-2. **KServe** — embedded in the `storageUri` to download the model at inference time.
+This project uses **Azure Blob Storage** to store trained models and DVC tracking artifacts.
 
-**Steps to generate a SAS token in the Azure Portal:**
-1. Go to your Storage Account → **Shared access signature** (under Security + networking).
-2. Under **Allowed services**, check ✅ **Blob**.
-3. Under **Allowed resource types**, check ✅ **Container** and ✅ **Object** (both required).
-4. Under **Allowed permissions**, check: Read, Write, Create, Add, List.
-5. Set an expiry date (e.g. 1 year from today).
-6. Click **Generate SAS and connection string**.
-7. Copy the **Connection string** — this is your `AZURE_STORAGE_CONNECTION_STRING`.
-8. Copy the **SAS token** query string (starting with `sv=...`) — this is embedded in `inference.yaml`.
+In production/demo usage, you only need the **Azure connection string** in two places:
+1. **GitHub Actions** — `AZURE_STORAGE_CONNECTION_STRING` is used to run `dvc pull/repro/push` and to upload the trained model blob during CI.
+2. **KServe** — the model download during pod init uses Kubernetes Secret `az-secret` (referenced by `sa-az-access`), which must contain `AZURE_STORAGE_CONNECTION_STRING`.
 
-**Required GitHub Repository Secrets:** Add to **Settings → Secrets... → Actions:**
-* `AZURE_STORAGE_CONNECTION_STRING`
-* `AZURE_STORAGE_SAS_TOKEN` (Only the trailing `sv=...` part)
-
-> **Note:** The SAS connection string format looks like:
-> `BlobEndpoint=https://storageaccountmlopspoc.blob.core.windows.net/;...;SharedAccessSignature=sv=...`
+> Generate the Azure **connection string** from your Storage Account in the Azure Portal and use it as `AZURE_STORAGE_CONNECTION_STRING`.
 
 ---
 
@@ -141,7 +128,7 @@ The pipeline runs automatically on every push to `main`. It achieves "Invisible 
 1. Triggers DVC pipeline dynamically reading from Azure Connection Strings
 2. Uploads updated DVC storage chunks safely (Hashes logic)
 3. Uploads `models/churn_model.pkl` explicitly to the Azure Blob KServe path using Git SHAs
-4. Updates `k8s/inference.yaml` securely with the latest storage URI and SAS Token
+4. Updates `k8s/inference.yaml` securely with the latest storage URI/path (no SAS token in Git)
 5. Commits `dvc.lock`, `metrics.json` and the YAML updates back automatically (triggering ArgoCD).
 
 ### 4. Kubernetes with KIND (Local Cluster) & KServe
@@ -159,7 +146,7 @@ kubectl wait --for=condition=ready pod -l control-plane=kserve-controller-manage
 
 ### 5. Deploy the Inference Service
 
-**Important:** Ensure `k8s/inference.yaml` has the correct `storageUri` with a valid SAS token. Also ensure `k8s/serviceaccount.yaml` has your `AZURE_STORAGE_CONNECTION_STRING` injected into Kubernetes secrets.
+**Important:** Ensure `k8s/inference.yaml` points to the correct model path in Azure Blob (no SAS token embedded). Also ensure `k8s/serviceaccount.yaml` has your `AZURE_STORAGE_CONNECTION_STRING` injected into Kubernetes secrets so KServe can download the model.
 
 ```bash
 # Apply namespace, secret, and service account
@@ -171,7 +158,7 @@ kubectl apply -f k8s/inference.yaml
 # Watch until READY = True (may take 2-3 minutes)
 kubectl get inferenceservice churn-predictor -n churn-model -w
 ```
-> **KServe Azure Authentication Note:** KServe expects the SAS token securely embedded into its generated `storageUri` inside of the `spec`. Make sure your Python pipeline is not double breaking string escaping inside of `inference.yaml`.
+> **KServe Azure Authentication Note:** KServe downloads the model from Azure Blob using the Kubernetes secret referenced by the ServiceAccount (`sa-az-access` / `az-secret`).
 
 ### 6. Test KServe Inference Live
 
@@ -242,7 +229,7 @@ ArgoCD detects change in tracked k8s/inference.yaml
 ArgoCD syncs → applies state to Kubernetes
         │
         ▼
-KServe securely streams model binary from Azure Blob via embedded SAS
+KServe securely streams model binary from Azure Blob using Kubernetes-provided Azure credentials
         │
         ▼
 KServe serves updated predictions via REST API without downtime
@@ -290,7 +277,6 @@ Response:
 ---
 
 ## Notes
-
-- The `storageUri` in `k8s/inference.yaml` contains an embedded SAS token. Regenerate and update it before expiry.
-- `k8s/serviceaccount.yaml` contains the Azure connection string secret for GitHub Actions — update this when regenerating the SAS token.
+- `k8s/inference.yaml` points to the Azure Blob model path (no SAS embedded). Regenerate/update your Azure connection string secret in Kubernetes if credentials change.
+- `k8s/serviceaccount.yaml` references the Kubernetes secret (`az-secret`) used by KServe to download from Azure Blob.
 - This is a demo project — production setups require monitoring, logging, secret rotation, and security hardening.

@@ -67,7 +67,7 @@ jobs:
     - name: Update inference.yaml with Azure model path
       if: env.MODEL_CHANGED == 'true'
       run: |
-        MODEL_URI="https://${{ env.AZURE_STORAGE_ACCOUNT }}.blob.core.windows.net/${{ env.AZURE_STORAGE_CONTAINER }}/models/${{ github.sha }}/?${{ secrets.AZURE_STORAGE_SAS_TOKEN }}"
+        MODEL_URI="https://${{ env.AZURE_STORAGE_ACCOUNT }}.blob.core.windows.net/${{ env.AZURE_STORAGE_CONTAINER }}/models/${{ github.sha }}/"
         python3 scripts/update_yaml.py "$MODEL_URI"
         echo "storageUri updated to: $MODEL_URI"
     
@@ -76,6 +76,6 @@ jobs:
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add k8s/inference.yaml dvc.lock metrics.json .dvc/config params.yaml dvc.yaml
+        git add k8s/inference.yaml dvc.lock metrics.json params.yaml dvc.yaml
         git commit -m "Update DVC pipeline and model Azure Blob path [skip ci]" || echo "No changes"
         git push || echo "No changes to push"

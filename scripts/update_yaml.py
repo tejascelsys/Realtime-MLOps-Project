@@ -1,4 +1,4 @@
-"""Update storageUri in inference.yaml with the given Azure Blob SAS URL."""
+"""Update `storageUri` in inference.yaml with the given Azure Blob URL."""
 import re
 import sys
 
@@ -11,7 +11,13 @@ uri = sys.argv[1]
 with open('k8s/inference.yaml', 'r') as f:
     content = f.read()
 
-content = re.sub(r'storageUri:.*', f'storageUri: "{uri}"', content)
+# Replace only the actual `storageUri:` YAML field (avoid touching comments).
+content = re.sub(
+    r'(?m)^(\s*storageUri:\s*).*$',
+    lambda m: f'{m.group(1)}"{uri}"',
+    content,
+    count=1,
+)
 
 with open('k8s/inference.yaml', 'w') as f:
     f.write(content)
