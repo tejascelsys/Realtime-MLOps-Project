@@ -10,4 +10,4 @@ spec:
     model:
       modelFormat:
         name: sklearn
-      storageUri: "https://storageaccountmlopspoc.blob.core.windows.net/models-container/models/c744c70de5542d2cf2c515486790f2435550dabd/"
+      storageUri: "https://storageaccountmlopspoc.blob.core.windows.net/models-container/models/7fe732c9b6427a3a1b1a69d4f3d21b27175a06ca/"
