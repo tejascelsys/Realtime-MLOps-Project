@@ -6,8 +6,6 @@ metadata:
 spec:
   predictor:
     serviceAccountName: sa-az-access
-    # Using the standard containers/initContainers to have full control over secrets and mounts.
-    # This bypasses KServe's automatic (and currently failing) initializer logic.
     containers:
       - name: kserve-container
         image: churn-kserve:latest
@@ -37,6 +35,16 @@ spec:
               secretKeyRef:
                 name: az-secret
                 key: AZURE_STORAGE_CONNECTION_STRING
+          - name: AZURE_STORAGE_ACCOUNT
+            valueFrom:
+              secretKeyRef:
+                name: az-secret
+                key: AZURE_STORAGE_ACCOUNT
+          - name: AZURE_STORAGE_SAS_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: az-secret
+                key: AZURE_STORAGE_SAS_TOKEN
         volumeMounts:
           - name: kserve-provision-location
             mountPath: /mnt/models
