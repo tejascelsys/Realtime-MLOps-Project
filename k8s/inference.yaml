@@ -3,6 +3,8 @@ kind: InferenceService
 metadata:
   name: churn-predictor
   namespace: churn-model
+  labels:
+    app.kubernetes.io/instance: churn-mlops
 spec:
   predictor:
     serviceAccountName: sa-az-access
@@ -13,33 +15,20 @@ spec:
           - "--model_name=churn-predictor"
           - "--model_dir=/mnt/models"
           - "--model_file=churn_model.pkl"
-        env:
-          - name: AZURE_STORAGE_CONNECTION_STRING
-            valueFrom:
-              secretKeyRef:
-                name: az-secret
-                key: AZURE_STORAGE_CONNECTION_STRING
         volumeMounts:
           - name: kserve-provision-location
             mountPath: /mnt/models
             readOnly: true
     initContainers:
-      - name: manual-storage-initializer
+      - name: storage-initializer
         image: docker.io/kserve/storage-initializer:v0.11.0
+        command: ["/bin/sh", "-c"]
         args:
-          - "https://storageaccountmlopspoc.blob.core.windows.net/models-container/models/7fe732c9b6427a3a1b1a69d4f3d21b27175a06ca/"
-          - "/mnt/models"
+          - |
+            # Persistent fix: Dynamically append SAS token from secret to URI
+            MODEL_URI="https://storageaccountmlopspoc.blob.core.windows.net/models-container/models/7fe732c9b6427a3a1b1a69d4f3d21b27175a06ca/"
+            /storage-initializer/scripts/initializer-entrypoint "${MODEL_URI}?${AZURE_STORAGE_SAS_TOKEN}" /mnt/models
         env:
-          - name: AZURE_STORAGE_CONNECTION_STRING
-            valueFrom:
-              secretKeyRef:
-                name: az-secret
-                key: AZURE_STORAGE_CONNECTION_STRING
-          - name: AZURE_STORAGE_ACCOUNT
-            valueFrom:
-              secretKeyRef:
-                name: az-secret
-                key: AZURE_STORAGE_ACCOUNT
           - name: AZURE_STORAGE_SAS_TOKEN
             valueFrom:
               secretKeyRef:
