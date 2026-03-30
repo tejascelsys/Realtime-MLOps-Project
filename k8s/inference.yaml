@@ -11,3 +11,10 @@ spec:
       modelFormat:
         name: sklearn
       storageUri: "https://storageaccountmlopspoc.blob.core.windows.net/models-container/models/7fe732c9b6427a3a1b1a69d4f3d21b27175a06ca/"
+      # Pass Azure credentials to KServe's storage-initializer (used when `storageUri` does not embed SAS).
+      env:
+        - name: AZURE_STORAGE_CONNECTION_STRING
+          valueFrom:
+            secretKeyRef:
+              name: az-secret
+              key: AZURE_STORAGE_CONNECTION_STRING
