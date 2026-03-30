@@ -3,18 +3,43 @@ kind: InferenceService
 metadata:
   name: churn-predictor
   namespace: churn-model
-  # storageUri is injected by GitHub Actions as the model path (no SAS token in Git).
 spec:
   predictor:
     serviceAccountName: sa-az-access
-    model:
-      modelFormat:
-        name: sklearn
-      storageUri: "https://storageaccountmlopspoc.blob.core.windows.net/models-container/models/7fe732c9b6427a3a1b1a69d4f3d21b27175a06ca/"
-      # Pass Azure credentials to KServe's storage-initializer (used when `storageUri` does not embed SAS).
-      env:
-        - name: AZURE_STORAGE_CONNECTION_STRING
-          valueFrom:
-            secretKeyRef:
-              name: az-secret
-              key: AZURE_STORAGE_CONNECTION_STRING
+    # Using the standard containers/initContainers to have full control over secrets and mounts.
+    # This bypasses KServe's automatic (and currently failing) initializer logic.
+    containers:
+      - name: kserve-container
+        image: churn-kserve:latest
+        args:
+          - "--model_name=churn-predictor"
+          - "--model_dir=/mnt/models"
+          - "--model_file=churn_model.pkl"
+        env:
+          - name: AZURE_STORAGE_CONNECTION_STRING
+            valueFrom:
+              secretKeyRef:
+                name: az-secret
+                key: AZURE_STORAGE_CONNECTION_STRING
+        volumeMounts:
+          - name: kserve-provision-location
+            mountPath: /mnt/models
+            readOnly: true
+    initContainers:
+      - name: manual-storage-initializer
+        image: docker.io/kserve/storage-initializer:v0.11.0
+        args:
+          - "https://storageaccountmlopspoc.blob.core.windows.net/models-container/models/7fe732c9b6427a3a1b1a69d4f3d21b27175a06ca/"
+          - "/mnt/models"
+        env:
+          - name: AZURE_STORAGE_CONNECTION_STRING
+            valueFrom:
+              secretKeyRef:
+                name: az-secret
+                key: AZURE_STORAGE_CONNECTION_STRING
+        volumeMounts:
+          - name: kserve-provision-location
+            mountPath: /mnt/models
+    volumes:
+      - name: kserve-provision-location
+        emptyDir: {}
