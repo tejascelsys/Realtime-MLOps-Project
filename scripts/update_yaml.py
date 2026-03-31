@@ -11,13 +11,21 @@ uri = sys.argv[1]
 with open('k8s/inference.yaml', 'r') as f:
     content = f.read()
 
-# Replace only the actual `storageUri:` YAML field (avoid touching comments).
-content = re.sub(
-    r'(?m)^(\s*storageUri:\s*).*$',
-    lambda m: f'{m.group(1)}"{uri}"',
-    content,
-    count=1,
-)
+# Detect if it's the new shell-wrapped format or old storageUri format
+if "MODEL_URI=" in content:
+    content = re.sub(
+        r'(?m)^(\s*MODEL_URI=\s*).*$',
+        lambda m: f'{m.group(1)}"{uri}"',
+        content,
+        count=1,
+    )
+else:
+    content = re.sub(
+        r'(?m)^(\s*storageUri:\s*).*$',
+        lambda m: f'{m.group(1)}"{uri}"',
+        content,
+        count=1,
+    )
 
 with open('k8s/inference.yaml', 'w') as f:
     f.write(content)
