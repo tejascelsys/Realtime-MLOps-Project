@@ -171,13 +171,42 @@ python api.py
 # Visit http://localhost:8000/docs
 ```
 
-### 2. 🧪 Local DVC Features (Experiment Tracking)
+### 2. 🧪 Local DVC Features & Experiment Tracking
 
 DVC acts as a smart cache and an experiment auditor natively integrated with Git.
 
-*   **The Smart Cache:** If you run `dvc repro` twice without changing code/parameters, DVC skips computation (`Data and pipelines are up to date`), saving cloud compute costs.
-*   **The Metrics Diff:** Open `params.yaml`, change the `n_estimators`, and run `dvc repro`. Use `dvc metrics diff` to see instantly how your Accuracy and AUC-ROC shifted before committing to Git!
-*   **The Time Machine:** To restore a bad model state simply `git checkout <old-commit-hash>` followed by `dvc pull` to bring back exact dataset states locally without relying on bulky Git LFS.
+#### The Smart Cache
+If you run `dvc repro` twice without changing code/parameters, DVC skips computation (`Data and pipelines are up to date`), saving cloud compute costs.
+
+#### The Metrics Diff
+Open `params.yaml`, change the `n_estimators`, and run `dvc repro`. Use `dvc metrics diff` to see instantly how your Accuracy and AUC-ROC shifted before committing to Git!
+```bash
+# Example output:
+# Path          Metric    Old      New      Change
+# metrics.json  accuracy  0.79155  0.81234  0.02079
+# metrics.json  roc_auc   0.84112  0.86543  0.02431
+dvc metrics diff
+```
+
+#### ⏪ The Time Machine (Rollback Data & Model)
+To restore a bad model state locally for debugging, simply checkout the old git commit and pull the old data/model artifacts using DVC:
+```bash
+# 1. Checkout the previous known good commit
+git checkout <old-commit-hash>
+
+# 2. Pull the exact datasets and model binaries for that commit
+dvc pull
+```
+
+#### 🔄 GitOps Production Rollback
+Because ArgoCD manages our cluster based on Git, rolling back production is as simple as reverting the commit that broke it.
+```bash
+# Revert the bad commit in Git
+git revert <bad-commit-hash>
+git push origin main
+
+# ArgoCD will automatically detect the reverted state and deploy the old model!
+```
 
 ### 3. GitHub Actions CI/CD
 
