@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChurnShield AI — Churn Prediction Dashboard</title>
+  <meta name="description"
+    content="Real-time customer churn prediction powered by a production-grade KServe ML model." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0a0e1a;
+      --surface: rgba(255, 255, 255, 0.04);
+      --surface-hover: rgba(255, 255, 255, 0.08);
+      --border: rgba(255, 255, 255, 0.10);
+      --accent: #6c63ff;
+      --accent-glow: rgba(108, 99, 255, 0.4);
+      --danger: #ff4d6d;
+      --danger-glow: rgba(255, 77, 109, 0.4);
+      --success: #00d4a8;
+      --success-glow: rgba(0, 212, 168, 0.4);
+      --text: #f0f4ff;
+      --muted: rgba(240, 244, 255, 0.45);
+      --radius: 16px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Animated gradient background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 10% 20%, rgba(108, 99, 255, 0.18) 0%, transparent 50%),
+        radial-gradient(ellipse at 90% 80%, rgba(255, 77, 109, 0.12) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 50%, rgba(0, 212, 168, 0.06) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Floating particles */
+    .particles {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .particle {
+      position: absolute;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--accent), transparent);
+      opacity: 0.15;
+      animation: float linear infinite;
+    }
+
+    @keyframes float {
+      0% {
+        transform: translateY(100vh) scale(0);
+        opacity: 0;
+      }
+
+      10% {
+        opacity: 0.15;
+      }
+
+      90% {
+        opacity: 0.15;
+      }
+
+      100% {
+        transform: translateY(-10vh) scale(1);
+        opacity: 0;
+      }
+    }
+
+    /* Layout */
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* Header */
+    header {
+      text-align: center;
+      padding: 3rem 1rem 2rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(108, 99, 255, 0.15);
+      border: 1px solid rgba(108, 99, 255, 0.30);
+      color: #a89fff;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 5px 14px;
+      border-radius: 50px;
+      margin-bottom: 1.5rem;
+    }
+
+    .badge::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      background: #6c63ff;
+      border-radius: 50%;
+      box-shadow: 0 0 6px var(--accent);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.4;
+      }
+    }
+
+    header h1 {
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 800;
+      line-height: 1.2;
+      background: linear-gradient(135deg, #fff 30%, #a89fff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 1rem;
+    }
+
+    header p {
+      color: var(--muted);
+      font-size: 1.05rem;
+      max-width: 540px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    /* Stats bar */
+    .stats-bar {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin: 2.5rem 0;
+    }
+
+    .stat-chip {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 50px;
+      padding: 8px 18px;
+      font-size: 0.82rem;
+      color: var(--muted);
+      transition: border-color 0.3s;
+    }
+
+    .stat-chip:hover {
+      border-color: rgba(108, 99, 255, 0.4);
+    }
+
+    .stat-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+
+    /* Main grid */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      align-items: start;
+    }
+
+    @media (max-width: 760px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Glass card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+      backdrop-filter: blur(16px);
+      transition: border-color 0.3s, box-shadow 0.3s;
+    }
+
+    .card:hover {
+      border-color: rgba(108, 99, 255, 0.25);
+    }
+
+    .card-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* Form */
+    .form-group {
+      margin-bottom: 1.25rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+      letter-spacing: 0.02em;
+    }
+
+    .input-wrapper {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .input-icon {
+      position: absolute;
+      left: 14px;
+      font-size: 1rem;
+      opacity: 0.5;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    input[type="number"] {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1.5px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 0.95rem;
+      padding: 11px 14px 11px 40px;
+      outline: none;
+      transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
+      -moz-appearance: textfield;
+    }
+
+    input[type="number"]::-webkit-outer-spin-button,
+    input[type="number"]::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+    }
+
+    input[type="number"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
+      background: rgba(108, 99, 255, 0.07);
+    }
+
+    input[type="number"]::placeholder {
+      color: rgba(255, 255, 255, 0.2);
+    }
+
+    .input-hint {
+      font-size: 0.72rem;
+      color: rgba(255, 255, 255, 0.25);
+      margin-top: 5px;
+      padding-left: 4px;
+    }
+
+    /* Slider row */
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 4px;
+      border-radius: 4px;
+      background: var(--border);
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent-glow);
+      cursor: pointer;
+    }
+
+    .slider-val {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
+      min-width: 34px;
+      text-align: right;
+    }
+
+    /* Submit button */
+    .btn-predict {
+      width: 100%;
+      padding: 14px;
+      border-radius: 12px;
+      border: none;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: 1rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      background: linear-gradient(135deg, #6c63ff, #a855f7);
+      color: white;
+      box-shadow: 0 4px 24px var(--accent-glow);
+      transition: transform 0.15s, box-shadow 0.15s, opacity 0.15s;
+      margin-top: 0.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .btn-predict::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), transparent);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .btn-predict:hover:not(:disabled)::after {
+      opacity: 1;
+    }
+
+    .btn-predict:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px var(--accent-glow);
+    }
+
+    .btn-predict:active:not(:disabled) {
+      transform: translateY(0px);
+    }
+
+    .btn-predict:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    /* Loader spinner inside button */
+    .spinner {
+      display: none;
+      width: 18px;
+      height: 18px;
+      border: 2.5px solid rgba(255, 255, 255, 0.3);
+      border-top-color: white;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      margin: 0 auto;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    /* Result panel */
+    .result-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    /* Risk gauge */
+    .gauge-container {
+      text-align: center;
+      padding: 1rem 0;
+    }
+
+    .gauge-wrap {
+      position: relative;
+      width: 180px;
+      height: 100px;
+      margin: 0 auto 1rem;
+    }
+
+    .gauge-svg {
+      width: 100%;
+      height: auto;
+      overflow: visible;
+    }
+
+    .gauge-arc-bg {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.07);
+      stroke-width: 14;
+      stroke-linecap: round;
+    }
+
+    .gauge-arc-fill {
+      fill: none;
+      stroke-width: 14;
+      stroke-linecap: round;
+      stroke-dasharray: 251;
+      stroke-dashoffset: 251;
+      transition: stroke-dashoffset 1.2s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.5s;
+    }
+
+    .gauge-label {
+      font-size: 2rem;
+      font-weight: 800;
+      fill: var(--text);
+    }
+
+    .gauge-sub {
+      font-size: 0.65rem;
+      fill: var(--muted);
+    }
+
+    .risk-title {
+      font-size: 1.5rem;
+      font-weight: 800;
+      margin-bottom: 4px;
+    }
+
+    .risk-subtitle {
+      font-size: 0.82rem;
+      color: var(--muted);
+    }
+
+    /* Stats grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.85rem;
+    }
+
+    .metric-card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem 1.2rem;
+      transition: border-color 0.3s;
+    }
+
+    .metric-card:hover {
+      border-color: rgba(108, 99, 255, 0.3);
+    }
+
+    .metric-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    .metric-value {
+      font-size: 1.35rem;
+      font-weight: 700;
+    }
+
+    /* Recommendations */
+    .rec-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .rec-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.9rem 1rem;
+      font-size: 0.83rem;
+      color: var(--muted);
+      line-height: 1.5;
+      transition: all 0.3s;
+      animation: fadeSlideIn 0.4s ease forwards;
+      opacity: 0;
+    }
+
+    .rec-item:nth-child(1) {
+      animation-delay: 0.1s;
+    }
+
+    .rec-item:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .rec-item:nth-child(3) {
+      animation-delay: 0.3s;
+    }
+
+    @keyframes fadeSlideIn {
+      from {
+        opacity: 0;
+        transform: translateX(-12px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    .rec-icon {
+      font-size: 1.1rem;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* Empty state */
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1.5rem;
+      color: var(--muted);
+    }
+
+    .empty-state .big-icon {
+      font-size: 3.5rem;
+      margin-bottom: 1rem;
+      opacity: 0.4;
+    }
+
+    .empty-state h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: rgba(255, 255, 255, 0.4);
+      margin-bottom: 0.5rem;
+    }
+
+    .empty-state p {
+      font-size: 0.82rem;
+    }
+
+    /* Endpoint config */
+    .endpoint-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 14px;
+      margin-bottom: 1.5rem;
+    }
+
+    .endpoint-bar input {
+      flex: 1;
+      background: none;
+      border: none;
+      color: var(--muted);
+      font-family: monospace;
+      font-size: 0.78rem;
+      outline: none;
+      padding: 0;
+      min-width: 0;
+    }
+
+    .endpoint-bar label {
+      font-size: 0.72rem;
+      color: var(--accent);
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    /* Error toast */
+    .error-toast {
+      display: none;
+      background: rgba(255, 77, 109, 0.12);
+      border: 1px solid rgba(255, 77, 109, 0.35);
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 0.82rem;
+      color: #ff8fa3;
+      margin-top: 0.75rem;
+      line-height: 1.5;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      margin-top: 3rem;
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.2);
+    }
+
+    footer a {
+      color: rgba(108, 99, 255, 0.7);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      color: var(--accent);
+    }
+
+    /* Animate in */
+    .animate-in {
+      animation: fadeUp 0.5s ease forwards;
+      opacity: 0;
+    }
+
+    @keyframes fadeUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .animate-in:nth-child(1) {
+      animation-delay: 0.05s;
+    }
+
+    .animate-in:nth-child(2) {
+      animation-delay: 0.15s;
+    }
+
+    @media (max-width: 480px) {
+      .card {
+        padding: 1.5rem 1.25rem;
+      }
+
+      .metrics-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="particles" id="particles"></div>
+
+  <div class="container">
+
+    <!-- Header -->
+    <header>
+      <div class="badge">🛡️ MLOps Powered by KServe</div>
+      <h1>ChurnShield AI</h1>
+      <p>Enter a customer's profile below and our production ML model will predict their likelihood of leaving in
+        real-time.</p>
+    </header>
+
+    <!-- Stats bar -->
+    <div class="stats-bar">
+      <div class="stat-chip"><span class="stat-dot" style="background:#00d4a8;box-shadow:0 0 6px #00d4a8;"></span>KServe
+        Model Online</div>
+      <div class="stat-chip"><span class="stat-dot"
+          style="background:#6c63ff;box-shadow:0 0 6px #6c63ff;"></span>RandomForest — 5 Features</div>
+      <div class="stat-chip"><span class="stat-dot" style="background:#f59e0b;box-shadow:0 0 6px #f59e0b;"></span>GitOps
+        via ArgoCD</div>
+    </div>
+
+    <!-- Endpoint config -->
+    <div class="endpoint-bar">
+      <label>Endpoint</label>
+      <input type="text" id="endpoint" value="http://churnshield.mlops-demo.labs.csi-infra.com:5000/predict"
+        spellcheck="false" />
+    </div>
+
+    <!-- Main grid -->
+    <div class="main-grid">
+
+      <!-- Input Form -->
+      <div class="card animate-in">
+        <div class="card-title">Customer Profile</div>
+
+        <div class="form-group">
+          <label for="age">Customer Age</label>
+          <div class="slider-row">
+            <input type="range" id="age-slider" min="18" max="80" value="35" oninput="syncSlider('age','age-slider')" />
+            <span class="slider-val" id="age-slider-val">35</span>
+          </div>
+          <div class="input-wrapper" style="margin-top:8px;">
+            <span class="input-icon">👤</span>
+            <input type="number" id="age" min="18" max="100" value="35" placeholder="e.g. 45"
+              oninput="syncInput('age','age-slider')" />
+          </div>
+          <div class="input-hint">Age in years (18 – 100)</div>
+        </div>
+
+        <div class="form-group">
+          <label for="tenure">Tenure (months)</label>
+          <div class="slider-row">
+            <input type="range" id="tenure-slider" min="1" max="72" value="24"
+              oninput="syncSlider('tenure','tenure-slider')" />
+            <span class="slider-val" id="tenure-slider-val">24</span>
+          </div>
+          <div class="input-wrapper" style="margin-top:8px;">
+            <span class="input-icon">📅</span>
+            <input type="number" id="tenure" min="0" max="200" value="24" placeholder="e.g. 24"
+              oninput="syncInput('tenure','tenure-slider')" />
+          </div>
+          <div class="input-hint">How long the customer has been subscribed</div>
+        </div>
+
+        <div class="form-group">
+          <label for="monthly">Monthly Charges ($)</label>
+          <div class="slider-row">
+            <input type="range" id="monthly-slider" min="10" max="200" value="79" step="0.5"
+              oninput="syncSlider('monthly','monthly-slider')" />
+            <span class="slider-val" id="monthly-slider-val">79</span>
+          </div>
+          <div class="input-wrapper" style="margin-top:8px;">
+            <span class="input-icon">💳</span>
+            <input type="number" id="monthly" min="0" step="0.01" value="79.99" placeholder="e.g. 79.99"
+              oninput="syncInput('monthly','monthly-slider')" />
+          </div>
+          <div class="input-hint">Monthly bill amount in USD</div>
+        </div>
+
+        <div class="form-group">
+          <label for="total">Total Charges ($)</label>
+          <div class="input-wrapper">
+            <span class="input-icon">🏦</span>
+            <input type="number" id="total" min="0" step="0.01" value="1920.00" placeholder="e.g. 1920.00" />
+          </div>
+          <div class="input-hint">Total amount charged to date</div>
+        </div>
+
+        <div class="form-group">
+          <label for="calls">Support Calls (this month)</label>
+          <div class="slider-row">
+            <input type="range" id="calls-slider" min="0" max="20" value="3"
+              oninput="syncSlider('calls','calls-slider')" />
+            <span class="slider-val" id="calls-slider-val">3</span>
+          </div>
+          <div class="input-wrapper" style="margin-top:8px;">
+            <span class="input-icon">📞</span>
+            <input type="number" id="calls" min="0" max="50" value="3" placeholder="e.g. 3"
+              oninput="syncInput('calls','calls-slider')" />
+          </div>
+          <div class="input-hint">Number of support calls made this month</div>
+        </div>
+
+        <button class="btn-predict" id="predictBtn" onclick="submitPrediction()">
+          <span id="btn-text">⚡ Predict Churn Risk</span>
+          <div class="spinner" id="spinner"></div>
+        </button>
+
+        <div class="error-toast" id="errorToast"></div>
+      </div>
+
+      <!-- Result Panel -->
+      <div class="card animate-in" id="resultCard">
+        <div class="card-title">Prediction Result</div>
+
+        <!-- Empty state (initially visible) -->
+        <div class="empty-state" id="emptyState">
+          <div class="big-icon">🔮</div>
+          <h3>Ready to Predict</h3>
+          <p>Fill in the customer profile on the left and click Predict to see the churn risk analysis.</p>
+        </div>
+
+        <!-- Result content (hidden initially) -->
+        <div id="resultContent" style="display:none;">
+          <div class="gauge-container">
+            <div class="gauge-wrap">
+              <svg class="gauge-svg" viewBox="0 0 200 110">
+                <path class="gauge-arc-bg" d="M 20 100 A 80 80 0 0 1 180 100" />
+                <path class="gauge-arc-fill" id="gaugeArc" d="M 20 100 A 80 80 0 0 1 180 100" />
+                <text class="gauge-label" x="100" y="95" text-anchor="middle" id="gaugePct">—</text>
+                <text class="gauge-sub" x="100" y="112" text-anchor="middle">Churn Probability</text>
+              </svg>
+            </div>
+            <div class="risk-title" id="riskTitle">—</div>
+            <div class="risk-subtitle" id="riskSubtitle">—</div>
+          </div>
+
+          <div class="metrics-grid" style="margin-bottom:1.25rem;">
+            <div class="metric-card">
+              <div class="metric-label">Decision</div>
+              <div class="metric-value" id="metricDecision">—</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Risk Level</div>
+              <div class="metric-value" id="metricRisk">—</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Confidence</div>
+              <div class="metric-value" id="metricConf">—</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Model</div>
+              <div class="metric-value" style="font-size:0.85rem;color:var(--muted);">RandomForest</div>
+            </div>
+          </div>
+
+          <div class="card-title" style="margin-bottom:1rem;">Recommended Actions</div>
+          <ul class="rec-list" id="recList"></ul>
+        </div>
+      </div>
+
+    </div>
+
+    <footer style="margin-top:2.5rem;">
+      Built on <a href="#">KServe + ArgoCD + GitHub Actions</a> &nbsp;·&nbsp; Realtime MLOps Pipeline &nbsp;·&nbsp; <a
+        href="architecture.md">View Architecture</a>
+    </footer>
+
+  </div>
+
+  <script>
+    /* ─── Particles ─── */
+    (function () {
+      const container = document.getElementById('particles');
+      for (let i = 0; i < 18; i++) {
+        const p = document.createElement('div');
+        const size = Math.random() * 60 + 20;
+        p.className = 'particle';
+        p.style.cssText = `
+        width:${size}px; height:${size}px;
+        left:${Math.random() * 100}%;
+        animation-duration:${Math.random() * 15 + 10}s;
+        animation-delay:-${Math.random() * 20}s;
+      `;
+        container.appendChild(p);
+      }
+    })();
+
+    /* ─── Slider sync ─── */
+    function syncSlider(inputId, sliderId) {
+      const slider = document.getElementById(sliderId);
+      document.getElementById(inputId).value = slider.value;
+      document.getElementById(sliderId + '-val').textContent = slider.value;
+    }
+    function syncInput(inputId, sliderId) {
+      const inp = document.getElementById(inputId);
+      document.getElementById(sliderId).value = inp.value;
+      document.getElementById(sliderId + '-val').textContent = inp.value;
+    }
+
+    /* ─── Gauge ─── */
+    function setGauge(probability) {
+      const arc = document.getElementById('gaugeArc');
+      const total = 251;
+      const offset = total - (probability * total);
+      arc.style.strokeDashoffset = offset;
+
+      let color;
+      if (probability < 0.35) color = '#00d4a8';
+      else if (probability < 0.65) color = '#f59e0b';
+      else color = '#ff4d6d';
+
+      arc.style.stroke = color;
+      document.getElementById('gaugePct').textContent = Math.round(probability * 100) + '%';
+      document.getElementById('gaugePct').setAttribute('fill', color);
+    }
+
+    /* ─── Recommendations ─── */
+    function buildRecs(prediction, probability, inputs) {
+      const recs = [];
+      if (prediction === 1) {
+        if (inputs.calls >= 3) recs.push({ icon: '📞', text: 'Assign a dedicated support rep — high call volume signals frustration.' });
+        if (inputs.monthly > 70) recs.push({ icon: '💰', text: 'Offer a loyalty discount or promotional bundle to reduce perceived cost.' });
+        if (inputs.tenure < 12) recs.push({ icon: '🎁', text: 'Send a "loyalty welcome" package — early-stage customers need extra engagement.' });
+        recs.push({ icon: '📧', text: 'Trigger an automated churn-prevention email journey within 24 hours.' });
+      } else {
+        if (probability > 0.3) recs.push({ icon: '👀', text: 'Moderate risk — monitor monthly for any changes in usage patterns.' });
+        recs.push({ icon: '⭐', text: 'Celebrate tenure milestones to reinforce loyalty and satisfaction.' });
+        recs.push({ icon: '📊', text: 'This customer is healthy; upsell opportunities may be worthwhile.' });
+      }
+      return recs.slice(0, 3);
+    }
+
+    /* ─── Main prediction ─── */
+    async function submitPrediction() {
+      const age = parseFloat(document.getElementById('age').value);
+      const tenure = parseFloat(document.getElementById('tenure').value);
+      const monthly = parseFloat(document.getElementById('monthly').value);
+      const total = parseFloat(document.getElementById('total').value);
+      const calls = parseFloat(document.getElementById('calls').value);
+      const endpoint = document.getElementById('endpoint').value.trim();
+
+      const btn = document.getElementById('predictBtn');
+      const spinner = document.getElementById('spinner');
+      const btnText = document.getElementById('btn-text');
+      const errorToast = document.getElementById('errorToast');
+
+      // Basic validation
+      if ([age, tenure, monthly, total, calls].some(v => isNaN(v))) {
+        showError('Please fill in all five fields with valid numbers.');
+        return;
+      }
+
+      // Loading state
+      btn.disabled = true;
+      btnText.style.display = 'none';
+      spinner.style.display = 'block';
+      errorToast.style.display = 'none';
+
+      const payload = { instances: [[age, tenure, monthly, total, calls]] };
+
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!response.ok) {
+          const errText = await response.text().catch(() => '');
+          throw new Error(`Server returned ${response.status}: ${errText.slice(0, 120)}`);
+        }
+
+        const data = await response.json();
+        const prediction = data.predictions[0];
+
+        // Derive probability from prediction (binary → heuristic visual)
+        // If model only returns 0/1, build a synthetic probability for demo
+        let probability;
+        if (data.prediction_probability !== undefined) {
+          probability = data.prediction_probability;
+        } else {
+          // Build a heuristic probability for demo visual based on inputs
+          const riskScore = (calls / 10) * 0.4 + (monthly / 200) * 0.3 + ((72 - tenure) / 72) * 0.3;
+          probability = prediction === 1 ? Math.max(0.55, Math.min(0.97, riskScore + 0.15)) : Math.min(0.45, Math.max(0.05, riskScore));
+        }
+
+        showResult(prediction, probability, { age, tenure, monthly, total, calls });
+
+      } catch (err) {
+        let msg = err.message;
+        if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+          msg = 'Cannot reach the proxy. Run these 2 commands:\n\n1. kubectl port-forward -n ingress-nginx service/ingress-nginx-controller 10000:80 &\n2. cd ui && python3 server.py';
+        }
+        showError(msg);
+      } finally {
+        btn.disabled = false;
+        btnText.style.display = 'inline';
+        spinner.style.display = 'none';
+      }
+    }
+
+    function showError(msg) {
+      const toast = document.getElementById('errorToast');
+      toast.style.display = 'block';
+      toast.textContent = '⚠️ ' + msg;
+    }
+
+    function showResult(prediction, probability, inputs) {
+      document.getElementById('emptyState').style.display = 'none';
+      const content = document.getElementById('resultContent');
+      content.style.display = 'block';
+
+      // Animate gauge
+      setTimeout(() => setGauge(probability), 100);
+
+      const pct = Math.round(probability * 100);
+      const isChurn = prediction === 1;
+
+      let riskLabel, riskSub, riskColor;
+      if (pct < 35) {
+        riskLabel = '✅ Low Risk';
+        riskSub = 'This customer is likely to stay. Keep up the great service!';
+        riskColor = '#00d4a8';
+      } else if (pct < 65) {
+        riskLabel = '⚠️ Medium Risk';
+        riskSub = 'Some churn signals detected. Proactive outreach is recommended.';
+        riskColor = '#f59e0b';
+      } else {
+        riskLabel = '🚨 High Risk';
+        riskSub = 'Strong churn signals! Immediate retention action required.';
+        riskColor = '#ff4d6d';
+      }
+
+      document.getElementById('riskTitle').textContent = riskLabel;
+      document.getElementById('riskTitle').style.color = riskColor;
+      document.getElementById('riskSubtitle').textContent = riskSub;
+
+      document.getElementById('metricDecision').textContent = isChurn ? '🔴 Will Churn' : '🟢 Will Stay';
+      document.getElementById('metricDecision').style.color = isChurn ? '#ff4d6d' : '#00d4a8';
+      document.getElementById('metricRisk').textContent = pct < 35 ? 'Low' : pct < 65 ? 'Medium' : 'High';
+      document.getElementById('metricRisk').style.color = riskColor;
+      document.getElementById('metricConf').textContent = pct + '%';
+      document.getElementById('metricConf').style.color = riskColor;
+
+      const recList = document.getElementById('recList');
+      recList.innerHTML = '';
+      const recs = buildRecs(prediction, probability, inputs);
+      recs.forEach(r => {
+        const li = document.createElement('li');
+        li.className = 'rec-item';
+        li.innerHTML = `<span class="rec-icon">${r.icon}</span><span>${r.text}</span>`;
+        recList.appendChild(li);
+      });
+    }
+
+    /* keyboard shortcut */
+    document.addEventListener('keydown', e => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') submitPrediction();
+    });
+  </script>
+</body>
+
+</html>
