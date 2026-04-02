@@ -4,6 +4,19 @@ A fully automated, production-grade MLOps demonstration for a customer churn pre
 
 ---
 
+## 📍 Table of Contents
+- [What Does This Model Do?](#-what-does-this-model-do)
+- [Architecture At A Glance](#-architecture-at-a-glance)
+- [Project Structure](#-project-structure)
+- [Security & Secrets Setup](#-security--secrets-setup-kubernetes)
+- [Prerequisites](#-prerequisites)
+- [MLOps Pipeline Steps](#-mlops-pipeline-steps)
+- [Test KServe Inference Live](#-test-kserve-inference-live)
+- [ArgoCD Setup](#-argocd-gitops)
+- [Workflow Trace](#-complete-mlops-workflow-trace)
+
+---
+
 ## What Does This Model Do?
 
 **Real-World Example:**
@@ -36,14 +49,45 @@ Imagine you run a telecom company with thousands of customers. Some customers ar
 
 ## 🚀 Architecture At A Glance
 
-1. **Source of Truth (Git):** Code, hyperparameters (\`params.yaml\`), and GitOps configurations live here.
-2. **Data Ledger (DVC):** Tracks massive datasets, binaries, and training metrics (\`metrics.json\`). Artifacts are pushed to Azure Blob Storage using cryptographic hashes.
-3. **Continuous Integration (GitHub Actions):** Automatically runs \`dvc repro\` on code push, pushes new models to Azure, and updates Kubernetes definitions with the newest model URIs.
+1. **Source of Truth (Git):** Code, hyperparameters (`params.yaml`), and GitOps configurations live here.
+2. **Data Ledger (DVC):** Tracks massive datasets, binaries, and training metrics (`metrics.json`). Artifacts are pushed to Azure Blob Storage using cryptographic hashes.
+3. **Continuous Integration (GitHub Actions):** Automatically runs `dvc repro` on code push, pushes new models to Azure, and updates Kubernetes definitions with the newest model URIs.
 4. **Continuous Deployment (ArgoCD):** Watches the Git repository for updated Kubernetes definitions. Triggers KServe to spin up new endpoints with zero downtime.
 5. **Secure Inference Engine (KServe):** 
-    - **Shell-Wrapped Loader**: Uses a custom initContainer to dynamically pull binaries from azure while managing Kubernetes Secrets.
-    - **Secret-Based Auth**: This project storing SAS tokens on **Kubernetes Secrets** (\`az-secret\`).
-    - **Custom Domain**: Served on \`mlops-demo.labs.csi-infra.com\` via Nginx Ingress(Currently using local host mapping only).
+    - **Shell-Wrapped Loader**: Uses a custom initContainer to dynamically pull binaries from Azure while managing Kubernetes Secrets.
+    - **Secret-Based Auth**: Securely stores SAS tokens in **Kubernetes Secrets** (`az-secret`).
+    - **Custom Domain**: Served on `mlops-demo.labs.csi-infra.com` via Nginx Ingress.
+
+### System Diagram
+```mermaid
+flowchart TD
+  subgraph Dev["Version Control & Storage"]
+    Git("GitHub (Code & Manifests)")
+    Azure("Azure Blob (DVC Models)")
+  end
+
+  subgraph CI["Continuous Integration"]
+    GHA("GitHub Actions Pipeline")
+  end
+
+  subgraph Cluster["Kubernetes (KIND)"]
+    subgraph ArgoCD["GitOps"]
+      Argo("ArgoCD Controller")
+    end
+    subgraph KServe["Inference"]
+      ISVC["KServe InferenceService"]
+      Pod["Model Predictor Pod"]
+    end
+  end
+
+  Developer((Developer)) -->|"git push"| Git
+  Git --> GHA
+  GHA -->|"retrains & pushes"| Azure
+  GHA -->|"commits URI"| Git
+  Argo -.->|"watches"| Git
+  Argo -->|"deploys"| ISVC
+  ISVC -->|"loads model"| Azure
+```
 
 ---
 
@@ -232,53 +276,32 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.pas
 
 ## 🔁 Complete MLOps Workflow Trace
 
-\`\`\`
-Developer pushes code/parameters to GitHub (main branch)
-        │
-        ▼
-GitHub Actions Pipeline
-  ├── Recomputes cached Data Logic (DVC)
-  ├── Retrains model using parameters / metrics (churn_model.pkl)
-  ├── Uploads hashes privately → Azure Blob Storage
-  ├── Uploads raw .pkl securely directly to the Azure KServe path
-  ├── Updates k8s/inference.yaml storageUri securely via Python update_yaml.py
-  └── Commits metrics.json and dvc.lock mapping back into Git!
-        │
-        ▼
-ArgoCD detects change in tracked k8s/inference.yaml
-        │
-        ▼
-ArgoCD syncs state → applies changes to Kubernetes
-        │
-        ▼
-KServe securely loads model from Azure blob using 'az-secret'
-        │
-        ▼
-KServe serves predictions via Custom Domain on Nginx Ingress
-\`\`\`
+- [ ] **Developer** pushes code/parameters to GitHub (main branch)
+- [ ] **GitHub Actions Pipeline** triggers:
+  - [ ] Recomputes cached Data Logic (DVC)
+  - [ ] Retrains model using parameters / metrics (`churn_model.pkl`)
+  - [ ] Uploads hashes privately → Azure Blob Storage
+  - [ ] Uploads raw `.pkl` securely to Azure via Git SHA path
+  - [ ] Updates `k8s/inference.yaml` storageUri via `update_yaml.py`
+  - [ ] Commits `metrics.json` and `dvc.lock` back into Git
+- [ ] **ArgoCD** detects change in `k8s/inference.yaml`
+- [ ] **ArgoCD** syncs state → applies changes to Kubernetes
+- [ ] **KServe** securely loads model from Azure using `az-secret`
+- [ ] **KServe** serves predictions via Custom Domain on Nginx Ingress
 
 ---
 
-## Key Components Summary
+## 🛠 Local API Usage (`api.py`)
 
-| Component | Role |
-|-----------|------|
-| **Azure Blob Storage** | Persistent Model Registry |
-| **Kubernetes Secrets** | Secure Credential Management (\`az-secret\`) |
-| **Ingress Nginx** | Traffic Routing for \`mlops-demo\` Domain |
-| **KServe** | Serverless ML Inference |
-| **ArgoCD** | GitOps Lifecycle Management |
-| **DVC** | Data & Model Versioning |
+If you are running the FastAPI server locally (outside of Kubernetes) for rapid development:
 
----
+```bash
+# Start the local server
+python api.py
 
-## Local API Usage (FastAPI \`api.py\`)
-
-If running isolated code directly:
-
-\`\`\`bash
-curl -X POST http://localhost:8000/predict \\
-  -H "Content-Type: application/json" \\
+# Send a test prediction
+curl -X POST http://localhost:8000/predict \
+  -H "Content-Type: application/json" \
   -d '{
     "age": 45,
     "tenure_months": 24,
@@ -288,30 +311,24 @@ curl -X POST http://localhost:8000/predict \\
   }'
 ```
 
-Response:
-```json
-{
-  "churn": 1,
-  "churn_probability": 0.73
-}
-```
+---
+
+## 📊 Key Components Summary
+
+| Component | Role / Purpose |
+|-----------|----------------|
+| **Azure Blob Storage** | Persistent Model Registry (`storageaccountmlopspoc`) |
+| **DVC** | Data & Model versioning/tracking |
+| **GitHub Actions** | CI/CD — Automation of training and manifest updates |
+| **KServe** | Serverless ML Inference & Auto-scaling |
+| **ArgoCD** | GitOps Managed Lifecycle & Drift Detection |
+| **Kubernetes Secrets** | Secure Credential Management (`az-secret`) |
+| **Ingress Nginx** | Traffic Routing for `mlops-demo` Custom Domain |
+| **KIND / Minikube** | Local Kubernetes Infrastructure |
 
 ---
 
-## Key Components Summary
-
-| Component | Role |
-|-----------|------|
-| **Azure Blob Storage** | Remote storage for trained model (`storageaccountmlopspoc`) |
-| **DVC** | Model versioning and tracking (remote: Azure Blob) |
-| **GitHub Actions** | CI/CD — trains, uploads, and updates deployment YAML |
-| **KServe** | Serverless ML inference on Kubernetes |
-| **KIND** | Local Kubernetes cluster for testing |
-| **ArgoCD** | GitOps — auto-deploys when `inference.yaml` changes |
-
----
-
-## Notes
+## 📝 Notes
 - `k8s/inference.yaml` points to the Azure Blob model path (no SAS embedded). Regenerate/update your Azure connection string secret in Kubernetes if credentials change.
 - `k8s/serviceaccount.yaml` references the Kubernetes secret (`az-secret`) used by KServe to download from Azure Blob.
 - This is a demo project — production setups require monitoring, logging, secret rotation, and security hardening.
