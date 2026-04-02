@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architecture | ChurnShield AI</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --surface: rgba(30, 41, 59, 0.7);
+      --accent: #6c63ff;
+      --accent-glow: rgba(108, 99, 255, 0.3);
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --border: rgba(255, 255, 255, 0.1);
+      --radius: 20px;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      line-height: 1.6;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Background particles */
+    .particles {
+      position: fixed;
+      inset: 0;
+      z-index: -1;
+      background: radial-gradient(circle at 50% 50%, #1e293b 0%, #0f172a 100%);
+    }
+
+    .particle {
+      position: absolute;
+      background: var(--accent);
+      border-radius: 50%;
+      filter: blur(40px);
+      opacity: 0.12;
+      animation: drift linear infinite;
+    }
+
+    @keyframes drift {
+      from { transform: translate(0, 0); }
+      to { transform: translate(100px, 100px); }
+    }
+
+    .container {
+      max-width: 1000px;
+      margin: 0 auto;
+      padding: 4rem 2rem;
+    }
+
+    header {
+      margin-bottom: 3rem;
+      text-align: left;
+    }
+
+    .back-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 600;
+      font-size: 0.9rem;
+      margin-bottom: 1.5rem;
+      transition: transform 0.2s;
+    }
+
+    .back-link:hover {
+      transform: translateX(-5px);
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 1rem;
+      background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .lead {
+      font-size: 1.1rem;
+      color: var(--muted);
+      max-width: 700px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2.5rem;
+      backdrop-filter: blur(16px);
+      margin-bottom: 2rem;
+    }
+
+    section {
+      margin-bottom: 3rem;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    h2::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .mermaid-box {
+      background: rgba(255, 255, 255, 0.03);
+      border-radius: 12px;
+      padding: 2rem;
+      margin: 1.5rem 0;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+    }
+
+    .step-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+    }
+
+    .step-card {
+      background: rgba(255, 255, 255, 0.03);
+      padding: 1.5rem;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+      transition: border-color 0.3s;
+    }
+
+    .step-card:hover {
+      border-color: var(--accent);
+    }
+
+    .step-num {
+      width: 32px;
+      height: 32px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 4px 12px var(--accent-glow);
+    }
+
+    h3 {
+      font-size: 1.1rem;
+      margin-bottom: 0.75rem;
+      color: var(--text);
+    }
+
+    .step-card p {
+      font-size: 0.875rem;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    ul {
+      list-style: none;
+      margin-top: 0.5rem;
+    }
+
+    ul li {
+      position: relative;
+      padding-left: 1.5rem;
+      margin-bottom: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    ul li::before {
+      content: '→';
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+    }
+
+    footer {
+      text-align: center;
+      padding-top: 2rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="particles" id="particles"></div>
+
+  <div class="container">
+    <header>
+      <a href="index.html" class="back-link">← Back to Dashboard</a>
+      <h1>Pipeline Architecture</h1>
+      <p class="lead">A high-level overview of the end-to-end MLOps pipeline for the Churn Prediction model, built on GitOps principles.</p>
+    </header>
+
+    <div class="card">
+      <section>
+        <h2>The Big Picture</h2>
+        <div class="mermaid-box">
+          <div class="mermaid">
+            flowchart TD
+              classDef external fill:#1e293b,stroke:#6c63ff,stroke-width:2px,color:#fff;
+              classDef k8s fill:#1e293b,stroke:#3b82f6,stroke-width:2px,color:#fff;
+              classDef pod fill:#1e293b,stroke:#10b981,stroke-width:2px,color:#fff;
+
+              subgraph Dev["Version Control & Storage (External)"]
+                Git("GitHub (Code & Manifests)"):::external
+                Azure("Azure Blob (DVC Models)"):::external
+              end
+
+              subgraph CI["Continuous Integration"]
+                GHA("GitHub Actions Pipeline"):::external
+              end
+
+              subgraph Cluster["Kubernetes Cluster"]
+                subgraph ArgoCD["GitOps"]
+                  Argo("ArgoCD Controller"):::k8s
+                end
+                
+                subgraph Networking["Ingress & Routing"]
+                  Ingress("NGINX Ingress"):::k8s
+                  Knative("Knative Gateway"):::k8s
+                end
+                
+                subgraph ChurnModel["Namespace: churn-model"]
+                  Secret("az-secret"):::k8s
+                  
+                  subgraph ISVC["KServe Predictor Pod"]
+                    Init("Init Container"):::pod
+                    Vol[("Shared Volume")]:::pod
+                    Predictor("ML Predictor"):::pod
+                  end
+                end
+              end
+
+              Developer((Dev)) -->|"1"| Git
+              Git -->|"2"| GHA
+              GHA -->|"3"| Azure
+              GHA -->|"4"| Git
+              Argo -.->|"5"| Git
+              Argo -->|"6"| ISVC
+              Secret -.->|"7"| Init
+              Init <-->|"8"| Azure
+              Init -->|"9"| Vol
+              Vol -.->|"10"| Predictor
+              Client((Client)) -->|"11"| Ingress
+              Ingress -->|"12"| Knative
+              Knative -->|"13"| Predictor
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2>Technical Workflow</h2>
+        <div class="step-grid">
+          <div class="step-card">
+            <div class="step-num">1</div>
+            <h3>Source of Truth</h3>
+            <p>Code and Kubernetes manifests live in GitHub. Large datasets and models are tracked by DVC and stored in Azure Blob Storage.</p>
+          </div>
+          
+          <div class="step-card">
+            <div class="step-num">2</div>
+            <h3>Automated CI</h3>
+            <p>GitHub Actions triggers <code>dvc repro</code> to train the model, pushes artifacts to Azure, and auto-commits the new URI back to Git.</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-num">3</div>
+            <h3>GitOps Delivery</h3>
+            <p>ArgoCD watches the repo. When the YAML changes, it automatically triggers a rolling update in the Kubernetes cluster.</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-num">4</div>
+            <h3>Secure Inference</h3>
+            <p>KServe pods use an init-container to pull the model from Azure using secrets, serving the model via Nginx Ingress.</p>
+          </div>
+        </div>
+      </section>
+
+      <footer>
+        ChurnShield AI MLOps &copy; 2026 &nbsp;·&nbsp; Enterprise Grade Churn Prediction
+      </footer>
+    </div>
+  </div>
+
+  <script>
+    mermaid.initialize({ 
+      startOnLoad: true,
+      theme: 'dark',
+      flowchart: { useMaxWidth: true, htmlLabels: true, curve: 'basis' },
+      securityLevel: 'loose'
+    });
+
+    (function () {
+      const container = document.getElementById('particles');
+      for (let i = 0; i < 12; i++) {
+        const p = document.createElement('div');
+        const size = Math.random() * 100 + 50;
+        p.className = 'particle';
+        p.style.cssText = `
+          width:${size}px; height:${size}px;
+          left:${Math.random() * 100}%;
+          top:${Math.random() * 100}%;
+          animation-duration:${Math.random() * 20 + 10}s;
+          animation-delay:-${Math.random() * 20}s;
+        `;
+        container.appendChild(p);
+      }
+    })();
+  </script>
+</body>
+
+</html>

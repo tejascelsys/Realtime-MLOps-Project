@@ -341,8 +341,8 @@ http://localhost:5000
 | Customer Type | Age | Tenure | Monthly $ | Total $ | Calls | Expected Result |
 |---|---|---|---|---|---|---|
 | Happy long-term | 55 | 48 | 35 | 1680 | 0 | 🟢 Low Risk |
-| New struggling | 28 | 3 | 120 | 360 | 7 | 🔴 High Risk |
-| At-risk mid-tier | 40 | 12 | 90 | 1080 | 4 | ⚠️ Medium Risk |
+| New struggling | 28 | 3 | 120 | 360 | 10 | 🔴 High Risk |
+| At-risk mid-tier | 40 | 12 | 90 | 1080 | 2 | ⚠️ Medium Risk |
 
 > **Note:** The UI displays a risk probability percentage derived from the input features as a visual enhancement for demos, since the standard KServe SKLearn server returns binary predictions (0 or 1).
 
