@@ -13,6 +13,7 @@ A fully automated, production-grade MLOps demonstration for a customer churn pre
 - [MLOps Pipeline Steps](#-mlops-pipeline-steps)
 - [Test KServe Inference Live](#-test-kserve-inference-live)
 - [ArgoCD Setup](#-argocd-gitops)
+- [ChurnShield UI (Frontend)](#-churnshield-ui-frontend)
 - [Workflow Trace](#-complete-mlops-workflow-trace)
 
 ---
@@ -100,7 +101,8 @@ churn-model/
 ├── train.py                      # Train the RandomForest model
 ├── api.py                        # FastAPI local inference server
 ├── requirements.txt              # Python dependencies
-├── Dockerfile                    # Container image for KServe
+├── Dockerfile                    # Container image for local FastAPI
+├── Dockerfile.kserve             # Custom KServe SKLearn server image
 ├── dvc.yaml & dvc.lock           # DVC pipeline stages and lockfiles
 ├── metrics.json                  # Model accuracy and AUC-ROC (Tracked by DVC)
 ├── .dvc/config                   # DVC remote config (Azure Blob)
@@ -110,6 +112,9 @@ churn-model/
 │   ├── serviceaccount.yaml       # Namespace, Secrets, and ServiceAccount
 │   ├── inference.yaml            # KServe InferenceService (Shell-Wrapped)
 │   └── inferenceservice-config.yaml # Global KServe networking config (Custom Domain)
+├── ui/
+│   ├── index.html                # ChurnShield AI — Demo Frontend UI
+│   └── server.py                 # Python proxy server (bypasses browser CORS)
 ├── .github/workflows/
 │   └── main.yml                  # GitHub Actions CI/CD pipeline
 └── argocd/
@@ -274,6 +279,46 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.pas
 
 ---
 
+## 🖥️ ChurnShield UI (Frontend)
+
+**ChurnShield AI** is a responsive, production-quality demo dashboard that lets you visually test the churn prediction model through a browser. It features animated input sliders, a risk gauge, and AI-generated retention recommendations.
+
+### How it works
+
+Because browsers block cross-origin requests (CORS), the frontend uses a lightweight **Python proxy server** that:
+1. Serves the UI at `http://localhost:5000`
+2. Forwards `/predict` requests server-side to KServe (bypassing CORS restrictions)
+
+### Launch Steps
+
+**Step 1 — Start the KServe port-forward** (in a background terminal):
+```bash
+nohup kubectl port-forward -n ingress-nginx service/ingress-nginx-controller 10000:80 > /tmp/ingress-forward.log 2>&1 &
+```
+
+**Step 2 — Start the proxy + UI server:**
+```bash
+cd ui
+python3 server.py
+```
+
+**Step 3 — Open in browser:**
+```
+http://localhost:5000
+```
+
+### Demo Scenarios
+
+| Customer Type | Age | Tenure | Monthly $ | Total $ | Calls | Expected Result |
+|---|---|---|---|---|---|---|
+| Happy long-term | 55 | 48 | 35 | 1680 | 0 | 🟢 Low Risk |
+| New struggling | 28 | 3 | 120 | 360 | 7 | 🔴 High Risk |
+| At-risk mid-tier | 40 | 12 | 90 | 1080 | 4 | ⚠️ Medium Risk |
+
+> **Note:** The UI displays a risk probability percentage derived from the input features as a visual enhancement for demos, since the standard KServe SKLearn server returns binary predictions (0 or 1).
+
+---
+
 ## 🔁 Complete MLOps Workflow Trace
 
 - [ ] **Developer** pushes code/parameters to GitHub (main branch)
@@ -325,6 +370,7 @@ curl -X POST http://localhost:8000/predict \
 | **Kubernetes Secrets** | Secure Credential Management (`az-secret`) |
 | **Ingress Nginx** | Traffic Routing for `mlops-demo` Custom Domain |
 | **KIND / Minikube** | Local Kubernetes Infrastructure |
+| **ChurnShield UI** | Browser-based Demo Frontend (`ui/index.html` + `ui/server.py`) |
 
 ---
 
