@@ -18,12 +18,12 @@ Imagine you run a telecom company with thousands of customers. Some customers ar
 - Called customer support 3 times this month
 
 **Model Prediction:**
-```json
+\`\`\`json
 {
   "churn": 1,
   "churn_probability": 0.73
 }
-```
+\`\`\`
 
 **Translation:** Sarah has a **73% chance of canceling her subscription**. The model flags her so the business can proactively offer a discount or personalized support before she leaves.
 
@@ -36,17 +36,20 @@ Imagine you run a telecom company with thousands of customers. Some customers ar
 
 ## 🚀 Architecture At A Glance
 
-1. **Source of Truth (Git):** Code, hyperparameters (`params.yaml`), and GitOps configurations live here.
-2. **Data Ledger (DVC):** Tracks massive datasets, binaries, and training metrics (`metrics.json`). Artifacts are pushed to Azure Blob Storage using cryptographic hashes.
-3. **Continuous Integration (GitHub Actions):** Automatically runs `dvc repro` on code push, pushes new models to Azure, and updates Kubernetes definitions with the newest model URIs.
+1. **Source of Truth (Git):** Code, hyperparameters (\`params.yaml\`), and GitOps configurations live here.
+2. **Data Ledger (DVC):** Tracks massive datasets, binaries, and training metrics (\`metrics.json\`). Artifacts are pushed to Azure Blob Storage using cryptographic hashes.
+3. **Continuous Integration (GitHub Actions):** Automatically runs \`dvc repro\` on code push, pushes new models to Azure, and updates Kubernetes definitions with the newest model URIs.
 4. **Continuous Deployment (ArgoCD):** Watches the Git repository for updated Kubernetes definitions. Triggers KServe to spin up new endpoints with zero downtime.
-5. **Inference Engine (KServe):** Pulls the binary model securely from Azure via SAS tokens and serves a lightning-fast REST API.
+5. **Secure Inference Engine (KServe):** 
+    - **Shell-Wrapped Loader**: Uses a custom initContainer to dynamically pull binaries from azure while managing Kubernetes Secrets.
+    - **Secret-Based Auth**: This project storing SAS tokens on **Kubernetes Secrets** (\`az-secret\`).
+    - **Custom Domain**: Served on \`mlops-demo.labs.csi-infra.com\` via Nginx Ingress(Currently using local host mapping only).
 
 ---
 
 ## 📁 Project Structure
 
-```text
+\`\`\`text
 churn-model/
 ├── params.yaml                   # Centralized Hyperparameters & Data Configs
 ├── generate_data.py              # Generate synthetic churn dataset
@@ -60,19 +63,36 @@ churn-model/
 ├── models/
 │   └── churn_model.pkl           # Trained model (uploaded to Azure)
 ├── k8s/
-│   ├── serviceaccount.yaml       # Kubernetes namespace, secret & service account
-│   └── inference.yaml            # KServe InferenceService definition
+│   ├── serviceaccount.yaml       # Namespace, Secrets, and ServiceAccount
+│   ├── inference.yaml            # KServe InferenceService (Shell-Wrapped)
+│   └── inferenceservice-config.yaml # Global KServe networking config (Custom Domain)
 ├── .github/workflows/
 │   └── main.yml                  # GitHub Actions CI/CD pipeline
 └── argocd/
     └── application.yaml          # ArgoCD GitOps application
-```
+\`\`\`
+
+---
+
+## 🔐 Security & Secrets Setup (Kubernetes)
+
+This project storing SAS tokens on **Kubernetes Secrets**.
+
+### Create the Azure Secret
+Before deploying, create a secret named \`az-secret\` in the \`churn-model\` namespace containing your Azure Connection String:
+
+\`\`\`bash
+kubectl create namespace churn-model
+kubectl create secret generic az-secret \\
+  --from-literal=AZURE_STORAGE_CONNECTION_STRING='your_connection_string_here' \\
+  -n churn-model
+\`\`\`
+
+*Note: The KServe pod uses the \`sa-az-access\` ServiceAccount to grant the model loader access to this secret.*
 
 ---
 
 ## 🛠 Prerequisites
-
-Before running this project, ensure you have the following ready:
 
 | Tool | Purpose |
 |------|---------|
@@ -80,21 +100,9 @@ Before running this project, ensure you have the following ready:
 | Docker | Building container images |
 | kubectl | Interacting with Kubernetes |
 | kind | Running a local Kubernetes cluster |
-| Azure CLI (`az`) | Managing Azure Blob Storage |
-| Azure Storage Account | `storageaccountmlopspoc` with container `models-container` |
+| Azure CLI (\`az\`) | Managing Azure Blob Storage |
+| Azure Storage Account | \`storageaccountmlopspoc\` with container \`models-container\` |
 | GitHub Repository | For CI/CD via GitHub Actions |
-
----
-
-## 🔐 Azure Blob & GitHub Secrets Setup
-
-This project uses **Azure Blob Storage** to store trained models and DVC tracking artifacts.
-
-In production/demo usage, you only need the **Azure connection string** in two places:
-1. **GitHub Actions** — `AZURE_STORAGE_CONNECTION_STRING` is used to run `dvc pull/repro/push` and to upload the trained model blob during CI.
-2. **KServe** — the model download during pod init uses Kubernetes Secret `az-secret` (referenced by `sa-az-access`), which must contain `AZURE_STORAGE_CONNECTION_STRING`.
-
-> Generate the Azure **connection string** from your Storage Account in the Azure Portal and use it as `AZURE_STORAGE_CONNECTION_STRING`.
 
 ---
 
@@ -102,7 +110,7 @@ In production/demo usage, you only need the **Azure connection string** in two p
 
 ### 1. Local Setup & Testing
 
-```bash
+\`\`\`bash
 # Install dependencies
 pip install -r requirements.txt
 
@@ -112,83 +120,97 @@ dvc repro
 # Test API locally
 python api.py
 # Visit http://localhost:8000/docs
-```
+\`\`\`
 
 ### 2. 🧪 Local DVC Features (Experiment Tracking)
 
 DVC acts as a smart cache and an experiment auditor natively integrated with Git.
 
-*   **The Smart Cache:** If you run `dvc repro` twice without changing code/parameters, DVC skips computation (`Data and pipelines are up to date`), saving cloud compute costs.
-*   **The Metrics Diff:** Open `params.yaml`, change the `n_estimators`, and run `dvc repro`. Use `dvc metrics diff` to see instantly how your Accuracy and AUC-ROC shifted before committing to Git!
-*   **The Time Machine:** To restore a bad model state simply `git checkout <old-commit-hash>` followed by `dvc pull` to bring back exact dataset states locally without relying on bulky Git LFS.
+*   **The Smart Cache:** If you run \`dvc repro\` twice without changing code/parameters, DVC skips computation (\`Data and pipelines are up to date\`), saving cloud compute costs.
+*   **The Metrics Diff:** Open \`params.yaml\`, change the \`n_estimators\`, and run \`dvc repro\`. Use \`dvc metrics diff\` to see instantly how your Accuracy and AUC-ROC shifted before committing to Git!
+*   **The Time Machine:** To restore a bad model state simply \`git checkout <old-commit-hash>\` followed by \`dvc pull\` to bring back exact dataset states locally without relying on bulky Git LFS.
 
 ### 3. GitHub Actions CI/CD
 
-The pipeline runs automatically on every push to `main`. It achieves "Invisible MLOps":
+The pipeline runs automatically on push to \`main\`. It achieves "Invisible MLOps":
 1. Triggers DVC pipeline dynamically reading from Azure Connection Strings
 2. Uploads updated DVC storage chunks safely (Hashes logic)
-3. Uploads `models/churn_model.pkl` explicitly to the Azure Blob KServe path using Git SHAs
-4. Updates `k8s/inference.yaml` securely with the latest storage URI/path (no SAS token in Git)
-5. Commits `dvc.lock`, `metrics.json` and the YAML updates back automatically (triggering ArgoCD).
+3. Uploads raw .pkl securely directly to the Azure KServe path using Git SHAs
+4. Updates \`k8s/inference.yaml\` storageUri securely via Python \`update_yaml.py\`
+5. Commits \`dvc.lock\`, \`metrics.json\` and the YAML updates back automatically.
 
-### 4. Kubernetes with KIND (Local Cluster) & KServe
+### 4. Kubernetes with KIND & KServe
 
-```bash
-# Create a local KIND cluster
+\`\`\`bash
+# Create cluster
 kind create cluster --name churn-model
 
-# Install KServe (includes cert-manager, Istio, etc.)
+# Install KServe
 kubectl apply -f https://github.com/kserve/kserve/releases/download/v0.11.0/kserve.yaml
 
-# Wait for KServe controller to be ready
-kubectl wait --for=condition=ready pod -l control-plane=kserve-controller-manager -n kserve --timeout=120s
-```
+# Install Ingress Nginx (Required for local custom domains)
+kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml
+
+# Map the domain (on your host machine)
+echo "127.0.0.1 mlops-demo.labs.csi-infra.com" | sudo tee -a /etc/hosts
+echo "127.0.0.1 churn-predictor-churn-model.mlops-demo.labs.csi-infra.com" | sudo tee -a /etc/hosts
+\`\`\`
 
 ### 5. Deploy the Inference Service
 
-**Important:** Ensure `k8s/inference.yaml` points to the correct model path in Azure Blob (no SAS token embedded). Also ensure `k8s/serviceaccount.yaml` has your `AZURE_STORAGE_CONNECTION_STRING` injected into Kubernetes secrets so KServe can download the model.
-
-```bash
+\`\`\`bash
 # Apply namespace, secret, and service account
 kubectl apply -f k8s/serviceaccount.yaml
 
 # Deploy the KServe inference service
 kubectl apply -f k8s/inference.yaml
 
-# Watch until READY = True (may take 2-3 minutes)
+# Watch until READY = True
 kubectl get inferenceservice churn-predictor -n churn-model -w
-```
-> **KServe Azure Authentication Note:** KServe downloads the model from Azure Blob using the Kubernetes secret referenced by the ServiceAccount (`sa-az-access` / `az-secret`).
+\`\`\`
+> **KServe Azure Authentication Note:** KServe downloads the model from Azure Blob using the Kubernetes secret referenced by the ServiceAccount (\`sa-az-access\` / \`az-secret\`).
 
 ### 6. Test KServe Inference Live
 
-```bash
-# Port-forward the inference service locally
-kubectl port-forward -n churn-model service/churn-predictor-predictor 8080:80
+Both methods require the correct **5-feature set**: \`age\`, \`tenure_months\`, \`monthly_charges\`, \`total_charges\`, \`num_support_calls\`.
 
+#### Localhost Testing (Port-Forwarding)
+\`\`\`bash
+# Terminal 1: Port-forward ingress
+
+nohup kubectl port-forward -n ingress-nginx service/ingress-nginx-controller 10000:80 > /tmp/ingress-forward.log 2>&1 &
+
+# Terminal 2: Prediction via Localhost (using Host header)
 # Test prediction (sklearn expects data as an ordered array)
 # Order: age, tenure_months, monthly_charges, total_charges, num_support_calls
-curl -X POST http://localhost:8080/v1/models/churn-predictor:predict \
+
+curl -X POST http://churn-predictor-churn-model.mlops-demo.labs.csi-infra.com:10000/v1/models/churn-predictor:predict \
   -H "Content-Type: application/json" \
   -d '{
     "instances": [
       [45, 24, 79.99, 1920.00, 3]
     ]
   }'
-```
 
-Expected response:
-```json
-{
-  "predictions": [1]
-}
-```
+OR 
+
+nohup kubectl port-forward -n churn-model service/churn-predictor-predictor 8000:80 > /tmp/churn-forward.log 2>&1 &
+
+curl -X POST http://localhost:8000/v1/models/churn-predictor:predict \
+  -H "Content-Type: application/json" \
+  -d '{
+    "instances": [
+      [45, 24, 79.99, 1920.00, 3]
+    ]
+  }'
+\`\`\`
+
 
 ### 7. ArgoCD (GitOps)
 
-ArgoCD watches the Git repository for changes to `k8s/inference.yaml` and automatically deploys the latest model to Kubernetes.
+ArgoCD watches the Git repository for changes to \`k8s/inference.yaml\` and automatically deploys the latest model to Kubernetes.
 
-```bash
+\`\`\`bash
 # Install ArgoCD
 kubectl create namespace argocd
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
@@ -204,13 +226,13 @@ kubectl port-forward svc/argocd-server -n argocd 8080:443
 
 # Get the initial admin password
 kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" | base64 -d
-```
+\`\`\`
 
 ---
 
 ## 🔁 Complete MLOps Workflow Trace
 
-```
+\`\`\`
 Developer pushes code/parameters to GitHub (main branch)
         │
         ▼
@@ -218,7 +240,7 @@ GitHub Actions Pipeline
   ├── Recomputes cached Data Logic (DVC)
   ├── Retrains model using parameters / metrics (churn_model.pkl)
   ├── Uploads hashes privately → Azure Blob Storage
-  ├── Uploads raw .pkl securely directly to KServe container
+  ├── Uploads raw .pkl securely directly to the Azure KServe path
   ├── Updates k8s/inference.yaml storageUri securely via Python update_yaml.py
   └── Commits metrics.json and dvc.lock mapping back into Git!
         │
@@ -226,24 +248,37 @@ GitHub Actions Pipeline
 ArgoCD detects change in tracked k8s/inference.yaml
         │
         ▼
-ArgoCD syncs → applies state to Kubernetes
+ArgoCD syncs state → applies changes to Kubernetes
         │
         ▼
-KServe securely streams model binary from Azure Blob using Kubernetes-provided Azure credentials
+KServe securely loads model from Azure blob using 'az-secret'
         │
         ▼
-KServe serves updated predictions via REST API without downtime
-```
+KServe serves predictions via Custom Domain on Nginx Ingress
+\`\`\`
 
 ---
 
-## Local API Usage (FastAPI `api.py`)
+## Key Components Summary
+
+| Component | Role |
+|-----------|------|
+| **Azure Blob Storage** | Persistent Model Registry |
+| **Kubernetes Secrets** | Secure Credential Management (\`az-secret\`) |
+| **Ingress Nginx** | Traffic Routing for \`mlops-demo\` Domain |
+| **KServe** | Serverless ML Inference |
+| **ArgoCD** | GitOps Lifecycle Management |
+| **DVC** | Data & Model Versioning |
+
+---
+
+## Local API Usage (FastAPI \`api.py\`)
 
 If running isolated code directly:
 
-```bash
-curl -X POST http://localhost:8000/predict \
-  -H "Content-Type: application/json" \
+\`\`\`bash
+curl -X POST http://localhost:8000/predict \\
+  -H "Content-Type: application/json" \\
   -d '{
     "age": 45,
     "tenure_months": 24,
