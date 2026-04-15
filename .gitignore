@@ -11,3 +11,5 @@ nohup.out
 monitoring/reports/*.html
 monitoring/reports/*.json
 monitoring/drifted_data.csv
+monitoring_venv/
+get-pip.py
