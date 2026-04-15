@@ -73,9 +73,11 @@ KSERVE_ENDPOINT = os.getenv(
 # Paths
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
-MONITORING_DIR = PROJECT_ROOT / "monitoring"
+
+DATA_ROOT = Path(os.getenv("DATA_ROOT", str(PROJECT_ROOT)))
+MONITORING_DIR = DATA_ROOT / "monitoring"
 REPORTS_DIR = MONITORING_DIR / "reports"
-METRICS_PATH = PROJECT_ROOT / "metrics.json"
+METRICS_PATH = DATA_ROOT / "metrics.json"
 
 
 class ProxyHandler(SimpleHTTPRequestHandler):

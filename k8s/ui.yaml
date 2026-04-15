@@ -50,9 +50,9 @@ spec:
           volumeMounts:
             - name: sync-data
               mountPath: /sync
-          # Wait for git-sync to pull the repo, then start the server
-          command: ["sh", "-c", "while [ ! -f /sync/repo/ui/server.py ]; do echo 'Waiting for git-sync...'; sleep 2; done; cd /sync/repo/ui && python3 server.py"]
           env:
+            - name: DATA_ROOT
+              value: "/sync/repo"
             - name: KSERVE_ENDPOINT
               value: "http://churn-predictor-predictor.churn-model.svc.cluster.local/v1/models/churn-predictor:predict"
           ports:
