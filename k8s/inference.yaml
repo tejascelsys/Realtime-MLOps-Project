@@ -26,7 +26,7 @@ spec:
         args:
           - |
             # Persistent fix: Dynamically append SAS token from secret to URI
-            MODEL_URI="https://storageaccountmlopspoc.blob.core.windows.net/models-container/models/b8a5f9e50a7eea4dd65de8ce4ce1145395d984cb/"
+            MODEL_URI="https://storageaccountmlopspoc.blob.core.windows.net/models-container/models/24918327dc7eafba120ce52cd5fbdcd14f522419/"
             /storage-initializer/scripts/initializer-entrypoint "${MODEL_URI}?${AZURE_STORAGE_SAS_TOKEN}" /mnt/models
         env:
           - name: AZURE_STORAGE_SAS_TOKEN
