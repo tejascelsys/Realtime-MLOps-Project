@@ -1,0 +1,854 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ChurnShield AI — Model Monitoring Dashboard</title>
+  <meta name="description"
+    content="ML & Ops monitoring dashboard — data drift detection, model performance tracking, and operational metrics." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet" />
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #0a0e1a;
+      --surface: rgba(255, 255, 255, 0.04);
+      --surface-hover: rgba(255, 255, 255, 0.08);
+      --border: rgba(255, 255, 255, 0.10);
+      --accent: #6c63ff;
+      --accent-glow: rgba(108, 99, 255, 0.4);
+      --danger: #ff4d6d;
+      --danger-glow: rgba(255, 77, 109, 0.4);
+      --success: #00d4a8;
+      --success-glow: rgba(0, 212, 168, 0.4);
+      --warning: #f59e0b;
+      --warning-glow: rgba(245, 158, 11, 0.4);
+      --text: #f0f4ff;
+      --muted: rgba(240, 244, 255, 0.45);
+      --radius: 16px;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse at 20% 30%, rgba(108, 99, 255, 0.15) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 70%, rgba(0, 212, 168, 0.10) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 90%, rgba(255, 77, 109, 0.08) 0%, transparent 50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Particles */
+    .particles {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .particle {
+      position: absolute;
+      border-radius: 50%;
+      background: radial-gradient(circle, var(--success), transparent);
+      opacity: 0.12;
+      animation: float linear infinite;
+    }
+
+    @keyframes float {
+      0% { transform: translateY(100vh) scale(0); opacity: 0; }
+      10% { opacity: 0.12; }
+      90% { opacity: 0.12; }
+      100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+    }
+
+    .container {
+      position: relative;
+      z-index: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    /* Navigation */
+    .nav-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1rem;
+    }
+
+    .nav-back {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 50px;
+      border: 1px solid rgba(108, 99, 255, 0.25);
+      background: rgba(108, 99, 255, 0.08);
+      transition: all 0.3s;
+    }
+
+    .nav-back:hover {
+      background: rgba(108, 99, 255, 0.18);
+      border-color: rgba(108, 99, 255, 0.5);
+      transform: translateX(-2px);
+    }
+
+    .nav-grafana {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--warning);
+      text-decoration: none;
+      font-size: 0.85rem;
+      font-weight: 600;
+      padding: 8px 16px;
+      border-radius: 50px;
+      border: 1px solid rgba(245, 158, 11, 0.25);
+      background: rgba(245, 158, 11, 0.08);
+      transition: all 0.3s;
+    }
+
+    .nav-grafana:hover {
+      background: rgba(245, 158, 11, 0.18);
+      border-color: rgba(245, 158, 11, 0.5);
+    }
+
+    /* Header */
+    header {
+      text-align: center;
+      padding: 1.5rem 1rem 2rem;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(0, 212, 168, 0.12);
+      border: 1px solid rgba(0, 212, 168, 0.30);
+      color: #5aedc7;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 5px 14px;
+      border-radius: 50px;
+      margin-bottom: 1.5rem;
+    }
+
+    .badge::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      background: #00d4a8;
+      border-radius: 50%;
+      box-shadow: 0 0 6px #00d4a8;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    header h1 {
+      font-size: clamp(1.8rem, 4vw, 2.8rem);
+      font-weight: 800;
+      line-height: 1.2;
+      background: linear-gradient(135deg, #fff 30%, #5aedc7 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.75rem;
+    }
+
+    header p {
+      color: var(--muted);
+      font-size: 1rem;
+      max-width: 600px;
+      margin: 0 auto;
+      line-height: 1.7;
+    }
+
+    /* Summary cards */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem 1.2rem;
+      backdrop-filter: blur(16px);
+      transition: all 0.3s;
+      text-align: center;
+    }
+
+    .summary-card:hover {
+      border-color: rgba(108, 99, 255, 0.35);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .summary-icon {
+      font-size: 1.8rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .summary-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    .summary-value {
+      font-size: 1.5rem;
+      font-weight: 800;
+    }
+
+    .summary-sub {
+      font-size: 0.72rem;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* Action bar */
+    .action-bar {
+      display: flex;
+      justify-content: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 2rem;
+    }
+
+    .btn {
+      padding: 11px 24px;
+      border-radius: 10px;
+      border: none;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: 0.88rem;
+      font-weight: 700;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #00d4a8, #00b894);
+      color: #0a0e1a;
+      box-shadow: 0 4px 20px var(--success-glow);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 30px var(--success-glow);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      background: var(--surface);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      border-color: rgba(108, 99, 255, 0.4);
+      background: var(--surface-hover);
+    }
+
+    .btn-danger {
+      background: rgba(255, 77, 109, 0.12);
+      color: var(--danger);
+      border: 1px solid rgba(255, 77, 109, 0.3);
+    }
+
+    .btn-danger:hover {
+      background: rgba(255, 77, 109, 0.22);
+      border-color: rgba(255, 77, 109, 0.5);
+    }
+
+    /* Status banner */
+    .status-banner {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 18px;
+      border-radius: 12px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      margin-bottom: 1.5rem;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .status-banner.success {
+      display: flex;
+      background: rgba(0, 212, 168, 0.1);
+      border: 1px solid rgba(0, 212, 168, 0.3);
+      color: #5aedc7;
+    }
+
+    .status-banner.error {
+      display: flex;
+      background: rgba(255, 77, 109, 0.1);
+      border: 1px solid rgba(255, 77, 109, 0.3);
+      color: #ff8fa3;
+    }
+
+    .status-banner.loading {
+      display: flex;
+      background: rgba(108, 99, 255, 0.1);
+      border: 1px solid rgba(108, 99, 255, 0.3);
+      color: #a89fff;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Tabs */
+    .tabs {
+      display: flex;
+      gap: 0;
+      margin-bottom: 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab {
+      padding: 12px 22px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--muted);
+      border: none;
+      background: none;
+      border-bottom: 2px solid transparent;
+      transition: all 0.25s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tab:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+
+    /* Report frame */
+    .report-container {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-top: none;
+      border-radius: 0 0 var(--radius) var(--radius);
+      overflow: hidden;
+      min-height: 500px;
+    }
+
+    .report-frame {
+      width: 100%;
+      height: 700px;
+      border: none;
+      background: #fff;
+      display: none;
+    }
+
+    .report-frame.active {
+      display: block;
+    }
+
+    .report-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 500px;
+      color: var(--muted);
+      text-align: center;
+      padding: 3rem;
+    }
+
+    .report-placeholder .big-icon {
+      font-size: 4rem;
+      margin-bottom: 1rem;
+      opacity: 0.35;
+    }
+
+    .report-placeholder h3 {
+      font-size: 1.1rem;
+      color: rgba(255, 255, 255, 0.4);
+      margin-bottom: 0.5rem;
+    }
+
+    .report-placeholder p {
+      font-size: 0.85rem;
+      max-width: 400px;
+      line-height: 1.6;
+    }
+
+    .report-placeholder code {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: 8px 16px;
+      background: rgba(108, 99, 255, 0.12);
+      border: 1px solid rgba(108, 99, 255, 0.3);
+      border-radius: 8px;
+      font-size: 0.82rem;
+      color: #a89fff;
+    }
+
+    /* Grafana section */
+    .grafana-section {
+      margin-top: 2.5rem;
+    }
+
+    .section-title {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--warning);
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: rgba(245, 158, 11, 0.2);
+    }
+
+    .grafana-card {
+      background: var(--surface);
+      border: 1px solid rgba(245, 158, 11, 0.15);
+      border-radius: var(--radius);
+      padding: 2rem;
+      backdrop-filter: blur(16px);
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+
+    .grafana-info {
+      flex: 1;
+      min-width: 250px;
+    }
+
+    .grafana-info h3 {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+    }
+
+    .grafana-info p {
+      color: var(--muted);
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+
+    .grafana-metrics {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .grafana-metric {
+      background: rgba(245, 158, 11, 0.08);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      border-radius: 10px;
+      padding: 10px 16px;
+      font-size: 0.78rem;
+      color: var(--warning);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* Footer */
+    footer {
+      text-align: center;
+      margin-top: 3rem;
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.2);
+    }
+
+    footer a {
+      color: rgba(0, 212, 168, 0.5);
+      text-decoration: none;
+    }
+
+    footer a:hover {
+      color: var(--success);
+    }
+
+    /* Spinner */
+    .spinner-inline {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-top-color: currentColor;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* Animations */
+    .animate-in {
+      animation: fadeUp 0.5s ease forwards;
+      opacity: 0;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .animate-in:nth-child(1) { animation-delay: 0.05s; }
+    .animate-in:nth-child(2) { animation-delay: 0.1s; }
+    .animate-in:nth-child(3) { animation-delay: 0.15s; }
+    .animate-in:nth-child(4) { animation-delay: 0.2s; }
+    .animate-in:nth-child(5) { animation-delay: 0.25s; }
+
+    @media (max-width: 600px) {
+      .tabs { overflow-x: auto; }
+      .grafana-card { flex-direction: column; }
+      .summary-grid { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="particles" id="particles"></div>
+
+  <div class="container">
+
+    <!-- Nav -->
+    <nav class="nav-bar">
+      <a href="/" class="nav-back">← Back to ChurnShield</a>
+      <a href="http://localhost:3000" target="_blank" class="nav-grafana">📈 Open Grafana</a>
+    </nav>
+
+    <!-- Header -->
+    <header>
+      <div class="badge">📊 Evidently AI + Prometheus + Grafana</div>
+      <h1>Model Monitoring</h1>
+      <p>Track data drift, model performance degradation, and operational metrics across your ML pipeline in real-time.</p>
+    </header>
+
+    <!-- Summary Cards -->
+    <div class="summary-grid" id="summaryGrid">
+      <div class="summary-card animate-in">
+        <div class="summary-icon">🎯</div>
+        <div class="summary-label">Accuracy</div>
+        <div class="summary-value" id="metricAccuracy" style="color: var(--success);">—</div>
+        <div class="summary-sub">Latest model</div>
+      </div>
+      <div class="summary-card animate-in">
+        <div class="summary-icon">📈</div>
+        <div class="summary-label">AUC-ROC</div>
+        <div class="summary-value" id="metricAuc" style="color: var(--accent);">—</div>
+        <div class="summary-sub">Latest model</div>
+      </div>
+      <div class="summary-card animate-in">
+        <div class="summary-icon">📊</div>
+        <div class="summary-label">Ref Samples</div>
+        <div class="summary-value" id="metricRefSamples" style="color: var(--text);">—</div>
+        <div class="summary-sub">Training baseline</div>
+      </div>
+      <div class="summary-card animate-in">
+        <div class="summary-icon">🔄</div>
+        <div class="summary-label">Cur Samples</div>
+        <div class="summary-value" id="metricCurSamples" style="color: var(--text);">—</div>
+        <div class="summary-sub" id="driftSource">—</div>
+      </div>
+      <div class="summary-card animate-in">
+        <div class="summary-icon" id="driftIcon">⏳</div>
+        <div class="summary-label">Drift Status</div>
+        <div class="summary-value" id="driftStatus" style="color: var(--muted);">Pending</div>
+        <div class="summary-sub">Run check below</div>
+      </div>
+    </div>
+
+    <!-- Actions -->
+    <div class="action-bar">
+      <button class="btn btn-primary" id="btnGenerate" onclick="runMonitoring()">
+        📊 Generate Reports
+      </button>
+      <button class="btn btn-danger" id="btnDrift" onclick="simulateDrift()">
+        🔀 Simulate Drift
+      </button>
+      <button class="btn btn-secondary" id="btnReset" onclick="resetDrift()">
+        🔄 Reset to Baseline
+      </button>
+    </div>
+
+    <!-- Status -->
+    <div class="status-banner" id="statusBanner">
+      <span id="statusIcon"></span>
+      <span id="statusText"></span>
+    </div>
+
+    <!-- Report Tabs -->
+    <div class="tabs" id="tabBar">
+      <button class="tab active" onclick="switchTab('drift', this)">📉 Data Drift</button>
+      <button class="tab" onclick="switchTab('performance', this)">🎯 Model Performance</button>
+      <button class="tab" onclick="switchTab('quality', this)">🔍 Data Quality</button>
+    </div>
+
+    <div class="report-container" id="reportContainer">
+      <iframe id="frame-drift" class="report-frame active" src="about:blank"></iframe>
+      <iframe id="frame-performance" class="report-frame" src="about:blank"></iframe>
+      <iframe id="frame-quality" class="report-frame" src="about:blank"></iframe>
+
+      <div class="report-placeholder" id="reportPlaceholder">
+        <div class="big-icon">📊</div>
+        <h3>No Reports Generated Yet</h3>
+        <p>Click <strong>"Generate Reports"</strong> above to run Evidently AI and create data drift, model performance, and data quality reports.</p>
+        <code>python monitoring/monitor.py</code>
+      </div>
+    </div>
+
+    <!-- Grafana Section -->
+    <div class="grafana-section">
+      <div class="section-title">📈 Operational Monitoring (Prometheus + Grafana)</div>
+      <div class="grafana-card">
+        <div class="grafana-info">
+          <h3>Live Inference Metrics</h3>
+          <p>Prometheus collects real-time metrics from the ChurnShield proxy server. Grafana visualizes request rates, latency, error counts, and prediction distribution. Use ChurnShield to make predictions and watch the dashboard update live.</p>
+          <p style="margin-top: 0.75rem;">
+            <strong style="color: var(--warning);">Access:</strong>
+            <code style="background: rgba(245,158,11,0.1); padding: 3px 8px; border-radius: 4px; font-size: 0.8rem; color: var(--warning);">
+              kubectl port-forward -n monitoring svc/grafana 3000:3000
+            </code>
+          </p>
+        </div>
+        <div class="grafana-metrics">
+          <div class="grafana-metric">📊 Requests/min</div>
+          <div class="grafana-metric">⏱️ Latency p95</div>
+          <div class="grafana-metric">🔴 Error Rate</div>
+          <div class="grafana-metric">🔮 Prediction %</div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      Built on <a href="/">ChurnShield AI</a> &nbsp;·&nbsp; Evidently AI + Prometheus + Grafana &nbsp;·&nbsp;
+      <a href="architecture.html">View Architecture</a>
+    </footer>
+
+  </div>
+
+  <script>
+    /* ─── Particles ─── */
+    (function () {
+      const container = document.getElementById('particles');
+      for (let i = 0; i < 14; i++) {
+        const p = document.createElement('div');
+        const size = Math.random() * 50 + 20;
+        p.className = 'particle';
+        p.style.cssText = `
+          width:${size}px; height:${size}px;
+          left:${Math.random() * 100}%;
+          animation-duration:${Math.random() * 18 + 12}s;
+          animation-delay:-${Math.random() * 20}s;
+        `;
+        container.appendChild(p);
+      }
+    })();
+
+    /* ─── State ─── */
+    let reportsLoaded = false;
+
+    /* ─── Tab switching ─── */
+    function switchTab(tab, btn) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.report-frame').forEach(f => f.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('frame-' + tab).classList.add('active');
+    }
+
+    /* ─── Status banner ─── */
+    function showStatus(type, icon, text) {
+      const banner = document.getElementById('statusBanner');
+      banner.className = 'status-banner ' + type;
+      document.getElementById('statusIcon').innerHTML = icon;
+      document.getElementById('statusText').textContent = text;
+    }
+
+    function hideStatus() {
+      document.getElementById('statusBanner').className = 'status-banner';
+    }
+
+    /* ─── Load reports into iframes ─── */
+    function loadReports() {
+      const ts = Date.now();
+      document.getElementById('frame-drift').src = '/reports/data_drift_report.html?t=' + ts;
+      document.getElementById('frame-performance').src = '/reports/model_performance_report.html?t=' + ts;
+      document.getElementById('frame-quality').src = '/reports/data_quality_report.html?t=' + ts;
+      document.getElementById('reportPlaceholder').style.display = 'none';
+      reportsLoaded = true;
+    }
+
+    /* ─── Load summary JSON ─── */
+    async function loadSummary() {
+      try {
+        const resp = await fetch('/reports/summary.json?t=' + Date.now());
+        if (!resp.ok) return;
+        const data = await resp.json();
+
+        const acc = data.model_accuracy;
+        const auc = data.model_auc_roc;
+        document.getElementById('metricAccuracy').textContent = typeof acc === 'number' ? (acc * 100).toFixed(1) + '%' : acc;
+        document.getElementById('metricAuc').textContent = typeof auc === 'number' ? auc.toFixed(4) : auc;
+        document.getElementById('metricRefSamples').textContent = data.reference_samples || '—';
+        document.getElementById('metricCurSamples').textContent = data.current_samples || '—';
+
+        const isDrifted = data.drift_source === 'drifted';
+        document.getElementById('driftSource').textContent = isDrifted ? 'Simulated drift' : 'Training split';
+        document.getElementById('driftIcon').textContent = isDrifted ? '🔴' : '🟢';
+        document.getElementById('driftStatus').textContent = isDrifted ? 'Drift Active' : 'No Drift';
+        document.getElementById('driftStatus').style.color = isDrifted ? 'var(--danger)' : 'var(--success)';
+
+        loadReports();
+      } catch (e) {
+        // Reports not generated yet — that's fine
+      }
+    }
+
+    /* ─── Generate reports ─── */
+    async function runMonitoring() {
+      const btn = document.getElementById('btnGenerate');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-inline"></span> Generating...';
+      showStatus('loading', '⏳', 'Running Evidently AI report generation...');
+
+      try {
+        const resp = await fetch('/run-monitoring', { method: 'POST' });
+        const data = await resp.json();
+
+        if (resp.ok && data.status === 'ok') {
+          showStatus('success', '✅', 'Reports generated successfully! Loading...');
+          setTimeout(() => {
+            loadSummary();
+            hideStatus();
+          }, 1000);
+        } else {
+          showStatus('error', '❌', 'Error: ' + (data.error || 'Unknown error'));
+        }
+      } catch (e) {
+        showStatus('error', '❌', 'Failed to connect. Is the server running?');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '📊 Generate Reports';
+      }
+    }
+
+    /* ─── Simulate drift ─── */
+    async function simulateDrift() {
+      const btn = document.getElementById('btnDrift');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-inline"></span> Simulating...';
+      showStatus('loading', '🔀', 'Generating drifted production data...');
+
+      try {
+        const resp = await fetch('/simulate-drift', { method: 'POST' });
+        const data = await resp.json();
+
+        if (resp.ok && data.status === 'ok') {
+          showStatus('success', '🔀', 'Drifted data generated! Click "Generate Reports" to see drift detected.');
+          document.getElementById('driftIcon').textContent = '⚠️';
+          document.getElementById('driftStatus').textContent = 'Pending';
+          document.getElementById('driftStatus').style.color = 'var(--warning)';
+        } else {
+          showStatus('error', '❌', 'Error: ' + (data.error || 'Unknown error'));
+        }
+      } catch (e) {
+        showStatus('error', '❌', 'Failed to connect. Is the server running?');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '🔀 Simulate Drift';
+      }
+    }
+
+    /* ─── Reset drift ─── */
+    async function resetDrift() {
+      const btn = document.getElementById('btnReset');
+      btn.disabled = true;
+      showStatus('loading', '🔄', 'Resetting to baseline...');
+
+      try {
+        const resp = await fetch('/reset-drift', { method: 'POST' });
+        const data = await resp.json();
+
+        if (resp.ok && data.status === 'ok') {
+          showStatus('success', '✅', 'Reset to baseline. Click "Generate Reports" to refresh.');
+          document.getElementById('driftIcon').textContent = '🟢';
+          document.getElementById('driftStatus').textContent = 'Baseline';
+          document.getElementById('driftStatus').style.color = 'var(--success)';
+          document.getElementById('driftSource').textContent = 'Training split';
+        } else {
+          showStatus('error', '❌', 'Error: ' + (data.error || 'Unknown error'));
+        }
+      } catch (e) {
+        showStatus('error', '❌', 'Failed to connect.');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    /* ─── Init ─── */
+    loadSummary();
+  </script>
+</body>
+
+</html>

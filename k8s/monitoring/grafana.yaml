@@ -1,0 +1,371 @@
+---
+# ─── Grafana Datasource ConfigMap ───
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  namespace: monitoring
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus.monitoring.svc.cluster.local:9090
+        isDefault: true
+        editable: true
+
+---
+# ─── Grafana Dashboard ConfigMap ───
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboards-provider
+  namespace: monitoring
+data:
+  dashboards.yaml: |
+    apiVersion: 1
+    providers:
+      - name: 'default'
+        orgId: 1
+        folder: ''
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards
+          foldersFromFilesStructure: false
+
+---
+# ─── Grafana Pre-Built Dashboard ───
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-churnshield
+  namespace: monitoring
+data:
+  churnshield.json: |
+    {
+      "annotations": { "list": [] },
+      "editable": true,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "links": [],
+      "liveNow": true,
+      "panels": [
+        {
+          "title": "🔮 Prediction Requests / min",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 15,
+                "gradientMode": "scheme",
+                "pointSize": 5,
+                "showPoints": "auto"
+              },
+              "unit": "reqps"
+            }
+          },
+          "targets": [
+            {
+              "expr": "rate(churnshield_prediction_requests_total[1m])",
+              "legendFormat": "{{result}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "title": "⏱️ Prediction Latency (p50 / p95 / p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" },
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "gradientMode": "scheme"
+              },
+              "unit": "s"
+            }
+          },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, rate(churnshield_prediction_latency_seconds_bucket[5m]))",
+              "legendFormat": "p50",
+              "refId": "A"
+            },
+            {
+              "expr": "histogram_quantile(0.95, rate(churnshield_prediction_latency_seconds_bucket[5m]))",
+              "legendFormat": "p95",
+              "refId": "B"
+            },
+            {
+              "expr": "histogram_quantile(0.99, rate(churnshield_prediction_latency_seconds_bucket[5m]))",
+              "legendFormat": "p99",
+              "refId": "C"
+            }
+          ]
+        },
+        {
+          "title": "📊 Total Predictions",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "fixed", "fixedColor": "#6c63ff" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [{ "color": "#6c63ff", "value": null }]
+              }
+            }
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area",
+            "textMode": "auto"
+          },
+          "targets": [
+            {
+              "expr": "sum(churnshield_prediction_requests_total)",
+              "legendFormat": "Total Predictions",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "title": "🔴 Churn Predictions",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "fixed", "fixedColor": "#ff4d6d" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [{ "color": "#ff4d6d", "value": null }]
+              }
+            }
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area"
+          },
+          "targets": [
+            {
+              "expr": "sum(churnshield_prediction_requests_total{result=\"churn\"})",
+              "legendFormat": "Churn",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "title": "🟢 Retained Predictions",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 12, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "fixed", "fixedColor": "#00d4a8" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [{ "color": "#00d4a8", "value": null }]
+              }
+            }
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area"
+          },
+          "targets": [
+            {
+              "expr": "sum(churnshield_prediction_requests_total{result=\"no_churn\"})",
+              "legendFormat": "Retained",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "title": "❌ Errors",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 18, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "fixed", "fixedColor": "#f59e0b" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [{ "color": "#f59e0b", "value": null }]
+              }
+            }
+          },
+          "options": {
+            "colorMode": "background",
+            "graphMode": "area"
+          },
+          "targets": [
+            {
+              "expr": "sum(churnshield_prediction_errors_total)",
+              "legendFormat": "Errors",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "title": "📈 Churn vs Retained Ratio",
+          "type": "piechart",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "palette-classic" }
+            }
+          },
+          "options": {
+            "legend": { "displayMode": "list", "placement": "right" },
+            "pieType": "donut",
+            "tooltip": { "mode": "single" }
+          },
+          "targets": [
+            {
+              "expr": "sum(churnshield_prediction_requests_total) by (result)",
+              "legendFormat": "{{result}}",
+              "refId": "A"
+            }
+          ]
+        },
+        {
+          "title": "⏱️ Average Latency",
+          "type": "gauge",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "#00d4a8", "value": null },
+                  { "color": "#f59e0b", "value": 0.5 },
+                  { "color": "#ff4d6d", "value": 2 }
+                ]
+              },
+              "unit": "s",
+              "min": 0,
+              "max": 5
+            }
+          },
+          "targets": [
+            {
+              "expr": "rate(churnshield_prediction_latency_seconds_sum[5m]) / rate(churnshield_prediction_latency_seconds_count[5m])",
+              "legendFormat": "Avg Latency",
+              "refId": "A"
+            }
+          ]
+        }
+      ],
+      "schemaVersion": 39,
+      "style": "dark",
+      "tags": ["churnshield", "mlops", "monitoring"],
+      "templating": {
+        "list": [
+          {
+            "current": { "selected": false, "text": "Prometheus", "value": "Prometheus" },
+            "hide": 0,
+            "includeAll": false,
+            "name": "DS_PROMETHEUS",
+            "options": [],
+            "query": "prometheus",
+            "refresh": 1,
+            "type": "datasource"
+          }
+        ]
+      },
+      "time": { "from": "now-30m", "to": "now" },
+      "title": "ChurnShield AI — Inference Monitoring",
+      "uid": "churnshield-mlops",
+      "version": 1
+    }
+
+---
+# ─── Grafana Deployment ───
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: monitoring
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:10.4.1
+          ports:
+            - containerPort: 3000
+          env:
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: "admin"
+            - name: GF_USERS_ALLOW_SIGN_UP
+              value: "false"
+            - name: GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH
+              value: "/var/lib/grafana/dashboards/churnshield.json"
+          volumeMounts:
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboards-provider
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: dashboard-churnshield
+              mountPath: /var/lib/grafana/dashboards
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: datasources
+          configMap:
+            name: grafana-datasources
+        - name: dashboards-provider
+          configMap:
+            name: grafana-dashboards-provider
+        - name: dashboard-churnshield
+          configMap:
+            name: grafana-dashboard-churnshield
+
+---
+# ─── Grafana Service ───
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: monitoring
+  labels:
+    app: grafana
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+  selector:
+    app: grafana

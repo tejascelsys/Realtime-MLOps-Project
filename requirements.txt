@@ -8,3 +8,5 @@ dvc>=3.38.0
 dvc-azure>=3.0.0
 azure-storage-blob>=12.19.0
 PyYAML>=6.0
+evidently>=0.4.0
+prometheus_client>=0.20.0

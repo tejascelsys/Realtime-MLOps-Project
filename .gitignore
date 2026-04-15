@@ -8,3 +8,6 @@ data/churn_data.csv
 models/churn_model.pkl
 .venv/
 nohup.out
+monitoring/reports/*.html
+monitoring/reports/*.json
+monitoring/drifted_data.csv
