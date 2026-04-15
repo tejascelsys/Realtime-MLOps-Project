@@ -1,0 +1,53 @@
+---
+# ─── UI Deployment ───
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: churnshield-ui
+  namespace: monitoring
+  labels:
+    app: churnshield-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: churnshield-ui
+  template:
+    metadata:
+      labels:
+        app: churnshield-ui
+    spec:
+      containers:
+        - name: churnshield-ui
+          image: churnshield-ui:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: KSERVE_ENDPOINT
+              value: "http://churn-predictor-predictor.churn-model.svc.cluster.local/v1/models/churn-predictor:predict"
+          ports:
+            - containerPort: 5000
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+
+---
+# ─── UI Service ───
+apiVersion: v1
+kind: Service
+metadata:
+  name: churnshield-ui
+  namespace: monitoring
+  labels:
+    app: churnshield-ui
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5000
+      targetPort: 5000
+      protocol: TCP
+  selector:
+    app: churnshield-ui

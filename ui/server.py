@@ -65,7 +65,10 @@ if PROMETHEUS_AVAILABLE:
     MODEL_INFO.labels(model_type="RandomForest", features="5").set(1)
 
 
-KSERVE_ENDPOINT = "http://churn-predictor-churn-model.mlops-demo.labs.csi-infra.com:10000/v1/models/churn-predictor:predict"
+KSERVE_ENDPOINT = os.getenv(
+    "KSERVE_ENDPOINT",
+    "http://churn-predictor-churn-model.mlops-demo.labs.csi-infra.com:10000/v1/models/churn-predictor:predict"
+)
 
 # Paths
 SCRIPT_DIR = Path(__file__).resolve().parent

@@ -8,6 +8,20 @@ metadata:
     app: monitoring
 
 ---
+# ─── Prometheus Storage PVC ───
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: prometheus-storage-pvc
+  namespace: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
 # ─── Prometheus ConfigMap ───
 apiVersion: v1
 kind: ConfigMap
@@ -30,7 +44,7 @@ data:
       - job_name: 'churnshield'
         scrape_interval: 10s
         static_configs:
-          - targets: ['10.10.30.112:5000']
+          - targets: ['churnshield-ui.monitoring.svc.cluster.local:5000']
             labels:
               app: 'churnshield'
               environment: 'demo'
@@ -84,7 +98,8 @@ spec:
           configMap:
             name: prometheus-config
         - name: storage
-          emptyDir: {}
+          persistentVolumeClaim:
+            claimName: prometheus-storage-pvc
 
 ---
 # ─── Prometheus Service ───

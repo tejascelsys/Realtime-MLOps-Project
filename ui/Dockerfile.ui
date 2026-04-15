@@ -1,0 +1,22 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Install prometheus_client
+RUN pip install --no-cache-dir prometheus_client
+
+# Copy necessary files and directories
+# The server.py relies on PROJECT_ROOT being the parent of ui/ (where server walks up).
+# Thus, we preserve the directory structure.
+COPY metrics.json /app/
+COPY monitoring /app/monitoring/
+COPY ui /app/ui/
+
+# Set working directory to UI where server.py lives
+WORKDIR /app/ui
+
+# Expose the default port
+EXPOSE 5000
+
+# Run the UI proxy server
+CMD ["python3", "server.py"]

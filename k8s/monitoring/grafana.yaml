@@ -17,6 +17,20 @@ data:
         editable: true
 
 ---
+# ─── Grafana Storage PVC ───
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-storage-pvc
+  namespace: monitoring
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+
+---
 # ─── Grafana Dashboard ConfigMap ───
 apiVersion: v1
 kind: ConfigMap
@@ -334,6 +348,8 @@ spec:
               mountPath: /etc/grafana/provisioning/dashboards
             - name: dashboard-churnshield
               mountPath: /var/lib/grafana/dashboards
+            - name: storage
+              mountPath: /var/lib/grafana
           resources:
             requests:
               cpu: 100m
@@ -351,6 +367,9 @@ spec:
         - name: dashboard-churnshield
           configMap:
             name: grafana-dashboard-churnshield
+        - name: storage
+          persistentVolumeClaim:
+            claimName: grafana-storage-pvc
 
 ---
 # ─── Grafana Service ───
