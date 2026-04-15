@@ -742,14 +742,34 @@
     /* ─── Load summary JSON ─── */
     async function loadSummary() {
       try {
+        let liveAcc = null;
+        let liveAuc = null;
+
+        // 1. Try loading LIVE training metrics first
+        try {
+          const liveResp = await fetch('/metrics-live?t=' + Date.now());
+          if (liveResp.ok) {
+            const liveData = await liveResp.json();
+            liveAcc = liveData.accuracy;
+            liveAuc = liveData.auc_roc;
+          }
+        } catch (e) { console.warn("Live metrics unavailable", e); }
+
+        // 2. Load the monitoring summary (Samples/Drift + Fallback metrics)
         const resp = await fetch('/reports/summary.json?t=' + Date.now());
-        if (!resp.ok) return;
+        if (!resp.ok) {
+          // If reports aren't generated yet, still show live metrics if we got them
+          if (liveAcc !== null) updateMetricCards(liveAcc, liveAuc);
+          return;
+        }
+        
         const data = await resp.json();
 
-        const acc = data.model_accuracy;
-        const auc = data.model_auc_roc;
-        document.getElementById('metricAccuracy').textContent = typeof acc === 'number' ? (acc * 100).toFixed(1) + '%' : acc;
-        document.getElementById('metricAuc').textContent = typeof auc === 'number' ? auc.toFixed(4) : auc;
+        // Use live metrics if available, otherwise fall back to report summary metrics
+        const acc = liveAcc !== null ? liveAcc : data.model_accuracy;
+        const auc = liveAuc !== null ? liveAuc : data.model_auc_roc;
+        updateMetricCards(acc, auc);
+
         document.getElementById('metricRefSamples').textContent = data.reference_samples || '—';
         document.getElementById('metricCurSamples').textContent = data.current_samples || '—';
 
@@ -761,8 +781,13 @@
 
         loadReports();
       } catch (e) {
-        // Reports not generated yet — that's fine
+        console.error("Failed to load summary", e);
       }
+    }
+
+    function updateMetricCards(acc, auc) {
+      document.getElementById('metricAccuracy').textContent = typeof acc === 'number' ? (acc * 100).toFixed(1) + '%' : acc;
+      document.getElementById('metricAuc').textContent = typeof auc === 'number' ? auc.toFixed(4) : auc;
     }
 
     /* ─── Generate reports ─── */

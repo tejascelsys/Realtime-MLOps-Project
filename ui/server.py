@@ -72,6 +72,7 @@ SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent
 MONITORING_DIR = PROJECT_ROOT / "monitoring"
 REPORTS_DIR = MONITORING_DIR / "reports"
+METRICS_PATH = PROJECT_ROOT / "metrics.json"
 
 
 class ProxyHandler(SimpleHTTPRequestHandler):
@@ -110,6 +111,18 @@ class ProxyHandler(SimpleHTTPRequestHandler):
         else:
             self.send_response(404)
             self.end_headers()
+
+    def _handle_metrics_live(self):
+        """Serve the live metrics.json from the project root."""
+        try:
+            if METRICS_PATH.exists():
+                with open(METRICS_PATH, "r") as f:
+                    data = json.load(f)
+                self._send_json(200, data)
+            else:
+                self._send_json(404, {"error": "metrics.json not found"})
+        except Exception as e:
+            self._send_json(500, {"error": str(e)})
 
     def _handle_predict(self):
         """Proxy prediction to KServe with Prometheus instrumentation."""
@@ -230,13 +243,17 @@ class ProxyHandler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         """Serve static files, monitoring page, reports, and Prometheus metrics."""
-        if self.path == "/monitoring" or self.path == "/monitoring/":
+        path_base = self.path.split('?')[0]
+        
+        if path_base == "/monitoring" or path_base == "/monitoring/":
             self._serve_file(SCRIPT_DIR / "monitoring.html", "text/html")
-        elif self.path == "/metrics":
+        elif path_base == "/metrics":
             self._serve_prometheus_metrics()
-        elif self.path.startswith("/reports/"):
+        elif path_base == "/metrics-live":
+            self._handle_metrics_live()
+        elif path_base.startswith("/reports/"):
             # Serve Evidently HTML reports
-            filename = self.path.split("/reports/")[1].split("?")[0]  # strip query params
+            filename = path_base.split("/reports/")[1]
             filepath = REPORTS_DIR / filename
             if filepath.exists() and filepath.is_file():
                 content_type = "text/html" if filename.endswith(".html") else "application/json"
