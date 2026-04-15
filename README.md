@@ -14,6 +14,7 @@ A fully automated, production-grade MLOps demonstration for a customer churn pre
 - [Test KServe Inference Live](#-test-kserve-inference-live)
 - [ArgoCD Setup](#-argocd-gitops)
 - [ChurnShield UI (Frontend)](#-churnshield-ui-frontend)
+- [Monitoring Infrastructure](#-monitoring-infrastructure)
 - [Workflow Trace](#-complete-mlops-workflow-trace)
 
 ---
@@ -111,10 +112,15 @@ churn-model/
 ├── k8s/
 │   ├── serviceaccount.yaml       # Namespace, Secrets, and ServiceAccount
 │   ├── inference.yaml            # KServe InferenceService (Shell-Wrapped)
-│   └── inferenceservice-config.yaml # Global KServe networking config (Custom Domain)
+│   ├── inferenceservice-config.yaml # Global KServe networking config (Custom Domain)
+│   └── monitoring/               # Prometheus & Grafana manifests
+├── monitoring/
+│   ├── monitor.py                # Evidently AI report generation script
+│   └── simulate_drift.py         # Drift simulation for demos
 ├── ui/
 │   ├── index.html                # ChurnShield AI — Demo Frontend UI
-│   └── server.py                 # Python proxy server (bypasses browser CORS)
+│   ├── monitoring.html           # Embedded Evidently Reports Dashboard
+│   └── server.py                 # Python proxy server & Prometheus metrics endpoint
 ├── .github/workflows/
 │   └── main.yml                  # GitHub Actions CI/CD pipeline
 └── argocd/
@@ -348,6 +354,41 @@ http://localhost:5000
 
 ---
 
+## 📈 Monitoring Infrastructure
+
+We utilize a dual-layer monitoring system for tracking both infrastructure health and machine learning model quality.
+
+### 1. Operations Monitoring (Prometheus & Grafana) 
+Tracks inference latency, request counts, error rates, and system health.
+
+**Setup & Usage:**
+```bash
+# 1. Deploy Prometheus and Grafana
+kubectl apply -f k8s/monitoring/
+
+# 2. Port-forward Grafana for access
+kubectl port-forward -n monitoring svc/grafana 3000:3000
+```
+- **Access Grafana**: `http://localhost:3000` (Login: `admin` / `admin`)
+- The UI proxy server (`ui/server.py`) automatically exposes a `/metrics` scrape endpoint that feeds directly into the pre-configured Grafana dashboard, giving real-time visualization of prediction distributions and latency.
+
+### 2. ML System Monitoring (Evidently AI)
+Tracks data drift, prediction drift, model quality, and feature distributions. It compares production inference data against baseline training reference data.
+
+**Setup & Usage:**
+```bash
+# 1. Generate normal reports (no drift)
+python monitoring/monitor.py
+
+# 2. Generate drifted data (for demonstration purposes), then re-run to detect drift
+python monitoring/simulate_drift.py
+python monitoring/monitor.py
+```
+- **Access Evidently Reports**: Open `http://localhost:5000/monitoring` (Requires running `ui/server.py` as detailed in the ChurnShield UI section).
+- This dashboard embeds the Data Drift, Model Performance, and Prediction Drift HTML reports, and highlights when shifts occur in customer features like `monthly_charges`.
+
+---
+
 ## 🔁 Complete MLOps Workflow Trace
 
 - [ ] **Developer** pushes code/parameters to GitHub (main branch)
@@ -400,6 +441,8 @@ curl -X POST http://localhost:8000/predict \
 | **Ingress Nginx** | Traffic Routing for `mlops-demo` Custom Domain |
 | **KIND / Minikube** | Local Kubernetes Infrastructure |
 | **ChurnShield UI** | Browser-based Demo Frontend (`ui/index.html` + `ui/server.py`) |
+| **Prometheus & Grafana** | Operations Monitoring (Latency, Requests, Errors) |
+| **Evidently AI** | ML Monitoring (Data/Prediction Drift & Model Quality) |
 
 ---
 

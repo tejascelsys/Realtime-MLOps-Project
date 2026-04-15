@@ -29,6 +29,11 @@ flowchart TD
       Knative("Knative Local Gateway")
     end
     
+    subgraph Monitoring["Monitoring (Namespace: monitoring)"]
+      Prometheus("Prometheus Server")
+      Grafana("Grafana Dashboards")
+    end
+
     subgraph ChurnModel["Namespace: churn-model"]
       Secret("az-secret (Kubernetes Secret)")
       
@@ -40,7 +45,8 @@ flowchart TD
     end
   end
 
-  Client("Client / API Consumer")
+  Client("Client / Application UI")
+  Evidently("Evidently AI (ML Drift Reports)")
 
   %% Developer Workflow
   Developer((Developer)) -->|"1. git push"| Git
@@ -58,10 +64,16 @@ flowchart TD
   Init -->|"9. extracts to"| Vol
   Vol -.->|"10. mounted by"| Predictor
   
-  %% Inference Flow
-  Client -->|"11. POST predict request (mlops-demo domain)"| Ingress
+  %% Inference Flow & Routing
+  Client -->|"11. POST predict request"| Ingress
   Ingress -->|"12. Routes traffic"| Knative
   Knative -->|"13. Forwards to"| Predictor
+
+  %% Monitoring Flow
+  Client -.->|"14. Exposes /metrics"| Prometheus
+  Prometheus -->|"15. Visualizes Metrics"| Grafana
+  Predictor -.->|"16. Baseline reference"| Evidently
+  Client -.->|"17. Production tracking"| Evidently
 ```
 
 ## Component Breakdown & Workflow Steps
@@ -90,3 +102,7 @@ Whenever a developer commits changes to the repository:
 ### 5. Client Request & Routing
 * **Step 11**: End users or client applications send predictions to the exposed NGINX Ingress controller using the custom domain (`http://churn-predictor-churn-model.mlops-demo.labs.csi-infra.com`).
 * **Step 12 & 13**: NGINX safely bridges over internal boundaries by routing traffic to the internal Knative local-gateway, which resolves internal services mapping to deliver your exact HTTP `POST` to the running Model Predictor pod.
+
+### 6. Operations & ML Monitoring
+* **Step 14 & 15 (Ops Monitoring)**: The UI effectively serves as a proxy application that exposes inference latencies, requests, and errors via a `/metrics` Prometheus endpoint. A clustered Prometheus configuration scrapes this data continuously to visualize in Grafana.
+* **Step 16 & 17 (ML Monitoring)**: Model predictions on real-world simulated client data is tracked seamlessly against the model's fixed baseline (`.csv` reference via DVC), enabling Evidently AI interactive reports that detect data and prediction drift.
