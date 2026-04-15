@@ -252,6 +252,11 @@
                   Knative("Knative Gateway"):::k8s
                 end
                 
+                subgraph Monitoring["Monitoring (namespace: monitoring)"]
+                  Prometheus("Prometheus"):::k8s
+                  Grafana("Grafana"):::k8s
+                end
+                
                 subgraph ChurnModel["Namespace: churn-model"]
                   Secret("az-secret"):::k8s
                   
@@ -276,6 +281,12 @@
               Client((Client)) -->|"11"| Ingress
               Ingress -->|"12"| Knative
               Knative -->|"13"| Predictor
+              
+              Evidently("Evidently AI"):::external
+              Client -.->|"14"| Prometheus
+              Prometheus -->|"15"| Grafana
+              Predictor -.->|"16"| Evidently
+              Client -.->|"17"| Evidently
           </div>
         </div>
       </section>
@@ -305,6 +316,12 @@
             <div class="step-num">4</div>
             <h3>Secure Inference</h3>
             <p>KServe pods use an init-container to pull the model from Azure using secrets, serving the model via Nginx Ingress.</p>
+          </div>
+
+          <div class="step-card">
+            <div class="step-num">5</div>
+            <h3>Ops & ML Monitoring</h3>
+            <p>Prometheus scrapes live inference metrics for Grafana dashboards, while Evidently AI detects data and prediction drift.</p>
           </div>
         </div>
       </section>
