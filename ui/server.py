@@ -76,11 +76,14 @@ PROJECT_ROOT = SCRIPT_DIR.parent
 
 DATA_ROOT = Path(os.getenv("DATA_ROOT", str(PROJECT_ROOT)))
 MONITORING_DIR = DATA_ROOT / "monitoring"
-REPORTS_DIR = MONITORING_DIR / "reports"
+REPORTS_DIR = Path(os.getenv("REPORTS_ROOT", str(MONITORING_DIR / "reports")))
 METRICS_PATH = DATA_ROOT / "metrics.json"
 
 
 class ProxyHandler(SimpleHTTPRequestHandler):
+    def __init__(self, *args, **kwargs):
+        # We serve static files from SCRIPT_DIR (the built-in ui/ directory)
+        super().__init__(*args, directory=str(SCRIPT_DIR), **kwargs)
     def log_message(self, format, *args):
         """Custom clean log format."""
         print(f"  [{self.address_string()}] {format % args}")
@@ -125,7 +128,8 @@ class ProxyHandler(SimpleHTTPRequestHandler):
                     data = json.load(f)
                 self._send_json(200, data)
             else:
-                self._send_json(404, {"error": "metrics.json not found"})
+                # Return a placeholder if git-sync hasn't pulled data yet
+                self._send_json(202, {"status": "syncing", "message": "Waiting for data from GitHub..."})
         except Exception as e:
             self._send_json(500, {"error": str(e)})
 

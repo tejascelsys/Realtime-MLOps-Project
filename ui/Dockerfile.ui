@@ -2,8 +2,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install prometheus_client
-RUN pip install --no-cache-dir prometheus_client
+# Install dependencies for UI and Monitoring reports
+RUN pip install --no-cache-dir \
+    prometheus_client \
+    pandas \
+    evidently \
+    scikit-learn
 
 # Copy necessary files and directories
 # The server.py relies on PROJECT_ROOT being the parent of ui/ (where server walks up).

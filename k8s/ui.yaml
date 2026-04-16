@@ -20,8 +20,10 @@ spec:
       volumes:
         - name: sync-data
           emptyDir: {}
+        - name: reports-data
+          emptyDir: {}
       containers:
-        # 1. The git-sync Sidecar Container
+        # 1. The git-sync Sidecar Container (GitOps updates for metrics.json)
         - name: git-sync
           image: registry.k8s.io/git-sync/git-sync:v3.6.5
           volumeMounts:
@@ -37,22 +39,28 @@ spec:
             - name: GIT_SYNC_DEST
               value: "repo"
             - name: GIT_SYNC_WAIT
-              value: "10" # Polling interval in seconds
+              value: "10"
+            - name: GIT_SYNC_SSL_VERIFY
+              value: "false"
           resources:
             requests:
               cpu: 50m
               memory: 64Mi
 
-        # 2. The Main UI Proxy Container
+        # 2. The Main UI Proxy Container (Full monitoring suite)
         - name: churnshield-ui
           image: churnshield-ui:latest
           imagePullPolicy: IfNotPresent
           volumeMounts:
             - name: sync-data
               mountPath: /sync
+            - name: reports-data
+              mountPath: /app/monitoring/reports
           env:
             - name: DATA_ROOT
               value: "/sync/repo"
+            - name: REPORTS_ROOT
+              value: "/app/monitoring/reports"
             - name: KSERVE_ENDPOINT
               value: "http://churn-predictor-predictor.churn-model.svc.cluster.local/v1/models/churn-predictor:predict"
           ports:
@@ -60,10 +68,10 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
               memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
 
 ---
 # ─── UI Service ───
