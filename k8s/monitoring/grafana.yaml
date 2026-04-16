@@ -11,6 +11,7 @@ data:
     datasources:
       - name: Prometheus
         type: prometheus
+        uid: prom-datasource
         access: proxy
         url: http://10.96.255.58:9090
         isDefault: true
@@ -73,7 +74,7 @@ data:
           "title": "🔮 Prediction Requests / min",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "datasource": { "type": "prometheus", "uid": "prom-datasource" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -99,7 +100,7 @@ data:
           "title": "⏱️ Prediction Latency (p50 / p95 / p99)",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "datasource": { "type": "prometheus", "uid": "prom-datasource" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" },
@@ -133,7 +134,7 @@ data:
           "title": "📊 Total Predictions",
           "type": "stat",
           "gridPos": { "h": 6, "w": 6, "x": 0, "y": 8 },
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "datasource": { "type": "prometheus", "uid": "prom-datasource" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "fixed", "fixedColor": "#6c63ff" },
@@ -150,7 +151,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(churnshield_prediction_requests_total)",
+              "expr": "sum(churnshield_prediction_requests_total) or on() vector(0)",
               "legendFormat": "Total Predictions",
               "refId": "A"
             }
@@ -160,7 +161,7 @@ data:
           "title": "🔴 Churn Predictions",
           "type": "stat",
           "gridPos": { "h": 6, "w": 6, "x": 6, "y": 8 },
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "datasource": { "type": "prometheus", "uid": "prom-datasource" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "fixed", "fixedColor": "#ff4d6d" },
@@ -176,7 +177,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(churnshield_prediction_requests_total{result=\"churn\"})",
+              "expr": "sum(churnshield_prediction_requests_total{result=\"churn\"}) or on() vector(0)",
               "legendFormat": "Churn",
               "refId": "A"
             }
@@ -186,7 +187,7 @@ data:
           "title": "🟢 Retained Predictions",
           "type": "stat",
           "gridPos": { "h": 6, "w": 6, "x": 12, "y": 8 },
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "datasource": { "type": "prometheus", "uid": "prom-datasource" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "fixed", "fixedColor": "#00d4a8" },
@@ -202,7 +203,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(churnshield_prediction_requests_total{result=\"no_churn\"})",
+              "expr": "sum(churnshield_prediction_requests_total{result=\"no_churn\"}) or on() vector(0)",
               "legendFormat": "Retained",
               "refId": "A"
             }
@@ -212,7 +213,7 @@ data:
           "title": "❌ Errors",
           "type": "stat",
           "gridPos": { "h": 6, "w": 6, "x": 18, "y": 8 },
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "datasource": { "type": "prometheus", "uid": "prom-datasource" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "fixed", "fixedColor": "#f59e0b" },
@@ -228,7 +229,7 @@ data:
           },
           "targets": [
             {
-              "expr": "sum(churnshield_prediction_errors_total)",
+              "expr": "sum(churnshield_prediction_errors_total) or on() vector(0)",
               "legendFormat": "Errors",
               "refId": "A"
             }
@@ -238,7 +239,7 @@ data:
           "title": "📈 Churn vs Retained Ratio",
           "type": "piechart",
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "datasource": { "type": "prometheus", "uid": "prom-datasource" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "palette-classic" }
@@ -261,7 +262,7 @@ data:
           "title": "⏱️ Average Latency",
           "type": "gauge",
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
-          "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+          "datasource": { "type": "prometheus", "uid": "prom-datasource" },
           "fieldConfig": {
             "defaults": {
               "color": { "mode": "thresholds" },

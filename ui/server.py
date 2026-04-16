@@ -15,8 +15,7 @@ import os
 import subprocess
 import sys
 import time
-import urllib.request
-import urllib.error
+import requests
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 
@@ -140,45 +139,52 @@ class ProxyHandler(SimpleHTTPRequestHandler):
 
         start_time = time.time()
         try:
-            req = urllib.request.Request(
+            # Use requests for better handling of in-cluster connectivity
+            response = requests.post(
                 KSERVE_ENDPOINT,
                 data=body,
                 headers={"Content-Type": "application/json"},
-                method="POST",
+                timeout=15
             )
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                result = resp.read()
-                duration = time.time() - start_time
+
+            # Record latency regardless of status code
+            duration = time.time() - start_time
+            if PROMETHEUS_AVAILABLE:
+                PREDICTION_LATENCY.observe(duration)
+
+            if response.status_code == 200:
+                result = response.json()
 
                 # Track Prometheus metrics
                 if PROMETHEUS_AVAILABLE:
-                    PREDICTION_LATENCY.observe(duration)
                     try:
-                        response_data = json.loads(result)
-                        prediction = response_data.get("predictions", [None])[0]
+                        prediction = result.get("predictions", [None])[0]
                         if prediction is not None:
                             label = "churn" if prediction == 1 else "no_churn"
                             PREDICTION_REQUESTS.labels(result=label).inc()
-                    except (json.JSONDecodeError, IndexError, KeyError):
+                        else:
+                            PREDICTION_REQUESTS.labels(result="unknown").inc()
+                    except Exception:
                         PREDICTION_REQUESTS.labels(result="unknown").inc()
 
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self._set_cors()
                 self.end_headers()
-                self.wfile.write(result)
+                self.wfile.write(json.dumps(result).encode())
+            else:
+                raise Exception(f"KServe returned {response.status_code}: {response.text}")
 
-        except urllib.error.URLError as e:
+        except Exception as e:
             if PROMETHEUS_AVAILABLE:
                 PREDICTION_ERRORS.labels(error_type="kserve_unreachable").inc()
 
-            error_msg = str(e.reason) if hasattr(e, "reason") else str(e)
             self.send_response(502)
             self.send_header("Content-Type", "application/json")
             self._set_cors()
             self.end_headers()
             self.wfile.write(
-                json.dumps({"error": f"KServe unreachable: {error_msg}"}).encode()
+                json.dumps({"error": f"KServe unreachable: {str(e)}"}).encode()
             )
 
         except Exception as e:

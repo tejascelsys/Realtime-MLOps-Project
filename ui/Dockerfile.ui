@@ -7,7 +7,8 @@ RUN pip install --no-cache-dir \
     prometheus_client \
     pandas \
     evidently \
-    scikit-learn
+    scikit-learn \
+    requests
 
 # Copy necessary files and directories
 # The server.py relies on PROJECT_ROOT being the parent of ui/ (where server walks up).

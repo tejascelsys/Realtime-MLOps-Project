@@ -62,7 +62,7 @@ spec:
             - name: REPORTS_ROOT
               value: "/app/monitoring/reports"
             - name: KSERVE_ENDPOINT
-              value: "http://churn-predictor-predictor.churn-model.svc.cluster.local/v1/models/churn-predictor:predict"
+              value: "http://10.96.156.204/v1/models/churn-predictor:predict"
           ports:
             - containerPort: 5000
           resources:
