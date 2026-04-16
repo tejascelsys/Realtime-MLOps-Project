@@ -12,7 +12,7 @@ data:
       - name: Prometheus
         type: prometheus
         access: proxy
-        url: http://prometheus.monitoring.svc.cluster.local:9090
+        url: http://10.96.255.58:9090
         isDefault: true
         editable: true
 
