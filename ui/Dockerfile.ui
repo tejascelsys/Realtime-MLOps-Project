@@ -5,17 +5,23 @@ WORKDIR /app
 # Install dependencies for UI and Monitoring reports
 RUN pip install --no-cache-dir \
     prometheus_client \
-    pandas \
+    pandas==2.1.4 \
+    numpy==1.26.4 \
+    pyarrow==10.0.1 \
+    pydantic==1.10.12 \
     evidently==0.4.9 \
-    scikit-learn \
+    scikit-learn==1.8.0 \
     requests
 
 # Copy necessary files and directories
 # The server.py relies on PROJECT_ROOT being the parent of ui/ (where server walks up).
 # Thus, we preserve the directory structure.
 COPY metrics.json /app/
+COPY params.yaml /app/
 COPY monitoring /app/monitoring/
 COPY ui /app/ui/
+COPY data /app/data/
+COPY models /app/models/
 
 # Set working directory to UI where server.py lives
 WORKDIR /app/ui

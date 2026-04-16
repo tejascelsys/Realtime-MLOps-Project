@@ -219,12 +219,12 @@ class ProxyHandler(SimpleHTTPRequestHandler):
     def _handle_run_monitoring(self):
         """Run monitoring/monitor.py and return status."""
         try:
-            monitor_script = str(MONITORING_DIR / "monitor.py")
-            python_exec = "python3"
+            monitor_script = str(DATA_ROOT / "monitoring" / "monitor.py")
+            python_exec = sys.executable  # Use the same python that's running this server
 
             result = subprocess.run(
                 [python_exec, monitor_script],
-                cwd=str(PROJECT_ROOT),
+                cwd=str(DATA_ROOT),
                 capture_output=True,
                 text=True,
                 timeout=120,
