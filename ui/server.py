@@ -27,15 +27,25 @@ try:
         Gauge,
         generate_latest,
         CONTENT_TYPE_LATEST,
+        CollectorRegistry,
+        multiprocess,
     )
 
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
     print("  ⚠️  prometheus_client not installed. /metrics endpoint disabled.")
-    print("  Install with: pip install prometheus_client")
 
 if PROMETHEUS_AVAILABLE:
+    # Use multiprocess registry if PROMETHEUS_MULTIPROC_DIR is set (survives restarts)
+    _multiproc_dir = os.environ.get("PROMETHEUS_MULTIPROC_DIR", "")
+    if _multiproc_dir:
+        os.makedirs(_multiproc_dir, exist_ok=True)
+        _registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(_registry)
+    else:
+        from prometheus_client import REGISTRY as _registry
+
     PREDICTION_REQUESTS = Counter(
         "churnshield_prediction_requests_total",
         "Total prediction requests",
@@ -120,15 +130,24 @@ class ProxyHandler(SimpleHTTPRequestHandler):
             self.end_headers()
 
     def _handle_metrics_live(self):
-        """Serve the live metrics.json from the project root."""
+        """Fetch live metrics.json from GitHub (always latest after CI/CD push)."""
+        GITHUB_RAW_URL = "https://raw.githubusercontent.com/tejascelsys/Realtime-MLOps-Project/main/metrics.json"
+        try:
+            req = requests.get(GITHUB_RAW_URL, timeout=5)
+            if req.status_code == 200:
+                self._send_json(200, req.json())
+                return
+        except Exception:
+            pass
+
+        # Fallback: try local file
         try:
             if METRICS_PATH.exists():
                 with open(METRICS_PATH, "r") as f:
                     data = json.load(f)
                 self._send_json(200, data)
             else:
-                # Return a placeholder if git-sync hasn't pulled data yet
-                self._send_json(202, {"status": "syncing", "message": "Waiting for data from GitHub..."})
+                self._send_json(202, {"status": "syncing", "message": "Fetching latest metrics from GitHub..."})
         except Exception as e:
             self._send_json(500, {"error": str(e)})
 
@@ -201,7 +220,7 @@ class ProxyHandler(SimpleHTTPRequestHandler):
         """Run monitoring/monitor.py and return status."""
         try:
             monitor_script = str(MONITORING_DIR / "monitor.py")
-            python_exec = "/home/tejasdp/Realtime-MLOps-Project/monitoring_venv/bin/python3.11"
+            python_exec = "python3"
 
             result = subprocess.run(
                 [python_exec, monitor_script],
@@ -299,7 +318,7 @@ class ProxyHandler(SimpleHTTPRequestHandler):
         if not PROMETHEUS_AVAILABLE:
             self._send_json(503, {"error": "prometheus_client not installed"})
             return
-        output = generate_latest()
+        output = generate_latest(_registry)
         self.send_response(200)
         self.send_header("Content-Type", CONTENT_TYPE_LATEST)
         self.end_headers()

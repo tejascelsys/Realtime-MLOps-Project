@@ -6,7 +6,7 @@ WORKDIR /app
 RUN pip install --no-cache-dir \
     prometheus_client \
     pandas \
-    evidently \
+    evidently==0.4.9 \
     scikit-learn \
     requests
 
