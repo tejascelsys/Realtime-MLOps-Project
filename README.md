@@ -102,25 +102,37 @@ churn-model/
 ├── train.py                      # Train the RandomForest model
 ├── api.py                        # FastAPI local inference server
 ├── requirements.txt              # Python dependencies
+├── metrics.json                  # Model accuracy and AUC-ROC (Tracked by DVC)
 ├── Dockerfile                    # Container image for local FastAPI
 ├── Dockerfile.kserve             # Custom KServe SKLearn server image
 ├── dvc.yaml & dvc.lock           # DVC pipeline stages and lockfiles
-├── metrics.json                  # Model accuracy and AUC-ROC (Tracked by DVC)
 ├── .dvc/config                   # DVC remote config (Azure Blob)
 ├── models/
 │   └── churn_model.pkl           # Trained model (uploaded to Azure)
+├── data/
+│   └── churn_data.csv            # Synthetic churn dataset (tracked by DVC)
 ├── k8s/
 │   ├── serviceaccount.yaml       # Namespace, Secrets, and ServiceAccount
 │   ├── inference.yaml            # KServe InferenceService (Shell-Wrapped)
 │   ├── inferenceservice-config.yaml # Global KServe networking config (Custom Domain)
-│   └── monitoring/               # Prometheus & Grafana manifests
+│   ├── ui.yaml                   # ChurnShield UI Deployment, Service & PVC
+│   └── monitoring/
+│       ├── prometheus.yaml       # Prometheus Namespace, ConfigMap, Deployment, Service & PVC
+│       └── grafana.yaml          # Grafana ConfigMap (datasource+dashboard), Deployment, Service & PVC
 ├── monitoring/
-│   ├── monitor.py                # Evidently AI report generation script
-│   └── simulate_drift.py         # Drift simulation for demos
+│   ├── monitor.py                # Evidently AI report generator (3 reports)
+│   ├── simulate_drift.py         # Synthetic drift data generator for demos
+│   ├── drifted_data.csv          # Auto-generated drifted dataset (created by simulate_drift.py)
+│   └── reports/                  # Output folder for generated HTML reports
+│       ├── data_drift_report.html
+│       ├── model_performance_report.html
+│       └── data_quality_report.html
 ├── ui/
-│   ├── index.html                # ChurnShield AI — Demo Frontend UI
+│   ├── index.html                # ChurnShield AI — Main Demo Frontend
 │   ├── monitoring.html           # Embedded Evidently Reports Dashboard
-│   └── server.py                 # Python proxy server & Prometheus metrics endpoint
+│   ├── architecture.html         # In-browser Architecture diagram page
+│   ├── server.py                 # Python proxy server & Prometheus metrics endpoint
+│   └── Dockerfile.ui             # Container image for the UI + Monitoring suite
 ├── .github/workflows/
 │   └── main.yml                  # GitHub Actions CI/CD pipeline
 └── argocd/
@@ -323,23 +335,45 @@ kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.pas
 Because browsers block cross-origin requests (CORS), the frontend uses a lightweight **Python proxy server** that:
 1. Serves the UI at `http://localhost:5000`
 2. Forwards `/predict` requests server-side to KServe (bypassing CORS restrictions)
+3. Exposes a `/metrics` endpoint for Prometheus scraping
+4. Runs `monitoring/monitor.py` and `monitoring/simulate_drift.py` on-demand via API
 
-### Launch Steps
+> **Architecture Note:** The UI proxy server (`ui/server.py`) is **no longer run locally**. It is packaged as a Docker container (`ui/Dockerfile.ui`) and deployed as a Kubernetes `Deployment` in the `monitoring` namespace via `k8s/ui.yaml`. This ensures the UI is always running, automatically restarts on failure, and metrics persist across restarts using a `PersistentVolumeClaim`.
 
-**Step 1 — Start the KServe port-forward** (in a background terminal):
+### Initial Deployment (First Time Only)
+
 ```bash
-nohup kubectl port-forward -n ingress-nginx service/ingress-nginx-controller 10000:80 > /tmp/ingress-forward.log 2>&1 &
+# 1. Build the Docker image
+docker build -t churnshield-ui:latest -f ui/Dockerfile.ui .
+
+# 2. Load it into the KIND cluster (KIND cannot pull from Docker Hub by default)
+kind load docker-image churnshield-ui:latest --name churn-model
+
+# 3. Deploy the UI, Service, and PVC
+kubectl apply -f k8s/ui.yaml
+
+# 4. Verify the pod is running
+kubectl get pods -n monitoring -l app=churnshield-ui
 ```
 
-**Step 2 — Start the proxy + UI server:**
+### Accessing the UI
+
+After deployment, use `kubectl port-forward` to expose the UI on your local machine:
+
 ```bash
-cd ui
-python3 server.py
+nohup kubectl port-forward --address 0.0.0.0 -n monitoring svc/churnshield-ui 5000:5000 > /tmp/ui-forward.log 2>&1 &
 ```
 
-**Step 3 — Open in browser:**
-```
-http://localhost:5000
+Then open: `http://localhost:5000` (or `http://churnshield.mlops-demo.labs.csi-infra.com:5000` if you have the custom domain configured)
+
+### Rebuilding After Code Changes
+
+If you change `ui/server.py`, `ui/index.html`, or `monitoring/monitor.py`:
+
+```bash
+docker build -t churnshield-ui:latest -f ui/Dockerfile.ui . && \
+kind load docker-image churnshield-ui:latest --name churn-model && \
+kubectl rollout restart deployment churnshield-ui -n monitoring
 ```
 
 ### Demo Scenarios
@@ -356,36 +390,136 @@ http://localhost:5000
 
 ## 📈 Monitoring Infrastructure
 
-We utilize a dual-layer monitoring system for tracking both infrastructure health and machine learning model quality.
+ChurnShield uses a **dual-layer monitoring system**: operational infrastructure monitoring via Prometheus & Grafana, and ML-specific health monitoring via Evidently AI. All components run as Kubernetes pods in the `monitoring` namespace.
 
-### 1. Operations Monitoring (Prometheus & Grafana) 
-Tracks inference latency, request counts, error rates, and system health.
+---
 
-**Setup & Usage:**
+### 1. Operations Monitoring (Prometheus & Grafana)
+
+Tracks every inference request in real time: counts, latency, errors, and churn vs. retained distribution.
+
+#### Kubernetes Manifests
+
+| File | What It Creates |
+|------|-----------------|
+| `k8s/monitoring/prometheus.yaml` | `monitoring` namespace, Prometheus `ConfigMap` (scrape config), `Deployment` (v2.51.0), `Service` (ClusterIP:9090), and 5Gi `PersistentVolumeClaim` for metric history |
+| `k8s/monitoring/grafana.yaml` | Grafana `Deployment` (v10.4.1), pre-built dashboard `ConfigMap`, datasource `ConfigMap`, 2Gi `PersistentVolumeClaim` for dashboard persistency, and `Service` (ClusterIP:3000) |
+
+#### How Prometheus Scrapes the UI
+
+Prometheus is configured (in `prometheus.yaml`) to scrape the ChurnShield UI pod at:
+```
+http://churnshield-ui.monitoring.svc.cluster.local:5000/metrics
+```
+Every **10 seconds**, it pulls counters and histograms from the `prometheus_client` library embedded in `ui/server.py`.
+
+#### Prometheus Metrics Exposed
+
+The following custom metrics are emitted by `ui/server.py`:
+
+| Metric | Type | Description |
+|--------|------|-------------|
+| `churnshield_prediction_requests_total` | Counter | Total predictions, labelled by `result` (`churn` / `no_churn`) |
+| `churnshield_prediction_latency_seconds` | Histogram | End-to-end KServe round-trip latency (buckets: 0.05s → 10s) |
+| `churnshield_prediction_errors_total` | Counter | Failed prediction requests (network errors, KServe timeouts, etc.) |
+
+#### Grafana Dashboard — ChurnShield AI Inference Monitoring
+
+The pre-built dashboard (`grafana-dashboard-churnshield` ConfigMap in `grafana.yaml`) loads automatically at `http://localhost:3000`. It contains **7 panels**:
+
+| Panel | Type | What It Shows |
+|-------|------|---------------|
+| 🔮 Prediction Requests / min | Time Series | Rate of churn vs. no_churn predictions over time (`rate(...[1m])`) |
+| ⏱️ Prediction Latency (p50/p95/p99) | Time Series | KServe response time percentiles over a 5-minute window |
+| 📊 Total Predictions | Stat (Big Number) | Cumulative prediction count since deployment |
+| 🔴 Churn Predictions | Stat (Big Number) | Count of customers flagged as likely to churn |
+| 🟢 Retained Predictions | Stat (Big Number) | Count of customers predicted as retained |
+| ❌ Errors | Stat (Big Number) | Count of failed inference requests |
+| 📈 Churn vs Retained Ratio | Donut Chart | Split of all predictions by result label |
+| ⏱️ Average Latency | Gauge (0-5s) | Rolling average latency with green/amber/red thresholds |
+
+**Setup & Access:**
 ```bash
-# 1. Deploy Prometheus and Grafana
+# Deploy Prometheus and Grafana
 kubectl apply -f k8s/monitoring/
 
-# 2. Port-forward Grafana for access
-kubectl port-forward -n monitoring svc/grafana 3000:3000
+# Port-forward Grafana
+nohup kubectl port-forward -n monitoring svc/grafana 3000:3000 > /tmp/grafana-forward.log 2>&1 &
 ```
 - **Access Grafana**: `http://localhost:3000` (Login: `admin` / `admin`)
-- The UI proxy server (`ui/server.py`) automatically exposes a `/metrics` scrape endpoint that feeds directly into the pre-configured Grafana dashboard, giving real-time visualization of prediction distributions and latency.
+- The ChurnShield dashboard loads as the **home dashboard** automatically.
+
+> **Metrics Persistence:** Prometheus metric data is stored on a `prometheus-storage-pvc` (5Gi PVC). Grafana dashboards and settings are stored on `grafana-storage-pvc` (2Gi PVC). Both survive pod restarts.
+
+---
 
 ### 2. ML System Monitoring (Evidently AI)
-Tracks data drift, prediction drift, model quality, and feature distributions. It compares production inference data against baseline training reference data.
 
-**Setup & Usage:**
+Tracks data drift, prediction drift, and model quality by comparing the **70% training split (reference)** against **30% production split (current)** — or against drifted data when drift simulation is active.
+
+#### Scripts
+
+| File | Purpose |
+|------|---------|
+| `monitoring/monitor.py` | Generates 3 Evidently HTML reports and a `summary.json` |
+| `monitoring/simulate_drift.py` | Generates synthetic `drifted_data.csv` with realistic distribution shifts |
+| `monitoring/drifted_data.csv` | Auto-generated — created by `simulate_drift.py`, deleted to reset baseline |
+| `monitoring/reports/` | Output folder for the 3 HTML report files |
+
+#### What `monitor.py` Generates
+
+| Report File | What It Covers |
+|-------------|----------------|
+| `data_drift_report.html` | Per-feature drift scores for all 5 input features + prediction drift. Uses statistical tests to detect distribution shifts (e.g. `monthly_charges` increasing significantly after drift simulation). |
+| `model_performance_report.html` | Classification metrics: Accuracy, Precision, Recall, F1, ROC-AUC, Confusion Matrix — comparing training (reference) performance versus current production behavior. |
+| `data_quality_report.html` | Missing values, feature ranges, value counts, and overall dataset statistics for both reference and current datasets side-by-side. |
+
+#### What `simulate_drift.py` Does
+
+Generates `monitoring/drifted_data.csv` with **three deliberate distribution shifts** to simulate a real production degradation scenario:
+
+| Feature | Original Range | Drifted Range | Simulated Scenario |
+|---------|---------------|---------------|--------------------|
+| `monthly_charges` | $20–$120 (avg ~$70) | $50–$180 (avg ~$115) | Price increase — 64% higher bills |
+| `num_support_calls` | 0–10 (avg 5.0) | 2–15 (avg ~8.1) | Service quality drop — 61% more support calls |
+| `tenure_months` | 1–72 (avg ~36) | 1–30 (avg ~15) | Influx of new short-tenure customers — 59% drop |
+| `churn` rate | ~35% baseline | ~83% in drifted set | Model would now assign high-risk to most customers |
+
+#### Demo Workflow — Detect Drift End-to-End
+
 ```bash
-# 1. Generate normal reports (no drift)
+# Step 1: Generate baseline report (no drift)
+#   → In the browser: click "Generate Report" in the Monitoring tab
+#   OR directly:
 python monitoring/monitor.py
 
-# 2. Generate drifted data (for demonstration purposes), then re-run to detect drift
+# Step 2: Simulate production drift
+#   → In the browser: click "Simulate Drift" button in the Monitoring tab
+#   OR directly:
 python monitoring/simulate_drift.py
+
+# Step 3: Re-generate report to detect drift
 python monitoring/monitor.py
+
+# Step 4: View the drift reports
+#   → Open: http://localhost:5000/monitoring
+
+# Step 5: Reset to baseline (remove drifted data)
+rm monitoring/drifted_data.csv
 ```
-- **Access Evidently Reports**: Open `http://localhost:5000/monitoring` (Requires running `ui/server.py` as detailed in the ChurnShield UI section).
-- This dashboard embeds the Data Drift, Model Performance, and Prediction Drift HTML reports, and highlights when shifts occur in customer features like `monthly_charges`.
+
+#### Accessing Evidently Reports via the UI
+
+The ChurnShield UI at `http://localhost:5000/monitoring` embeds all 3 HTML reports in an iframe dashboard. The following API endpoints are available from the browser:
+
+| Endpoint | Method | What It Does |
+|----------|--------|--------------|
+| `POST /run-monitoring` | POST | Triggers `monitor.py` inside the container, generates all 3 reports |
+| `POST /simulate-drift` | POST | Triggers `simulate_drift.py`, creates `drifted_data.csv` |
+| `GET /report/<filename>` | GET | Serves individual HTML report files |
+| `GET /metrics` | GET | Returns raw Prometheus metrics text |
+| `POST /predict` | POST | Proxies the request to KServe and returns prediction |
+
 
 ---
 
@@ -440,9 +574,49 @@ curl -X POST http://localhost:8000/predict \
 | **Kubernetes Secrets** | Secure Credential Management (`az-secret`) |
 | **Ingress Nginx** | Traffic Routing for `mlops-demo` Custom Domain |
 | **KIND / Minikube** | Local Kubernetes Infrastructure |
-| **ChurnShield UI** | Browser-based Demo Frontend (`ui/index.html` + `ui/server.py`) |
+| **ChurnShield UI** | Browser-based Demo Frontend — Dockerized & deployed in Kubernetes (`k8s/ui.yaml`) |
 | **Prometheus & Grafana** | Operations Monitoring (Latency, Requests, Errors) |
 | **Evidently AI** | ML Monitoring (Data/Prediction Drift & Model Quality) |
+
+---
+
+## 🔄 After Laptop Restart — Quick-Start Commands
+
+After a system reboot, the KIND cluster and all pods will still be running (KIND persists across reboots), but `kubectl port-forward` processes do not survive reboots. Run these commands to restore full functionality:
+
+```bash
+# 1. Expose the ChurnShield UI on port 5000 (required for the browser)
+nohup kubectl port-forward --address 0.0.0.0 -n monitoring svc/churnshield-ui 5000:5000 > /tmp/ui-forward.log 2>&1 &
+
+# 2. Expose Grafana on port 3000 (optional — for monitoring dashboard)
+nohup kubectl port-forward -n monitoring svc/grafana 3000:3000 > /tmp/grafana-forward.log 2>&1 &
+
+# 3. Expose Ingress on port 10000 (optional — for direct KServe curl testing)
+nohup kubectl port-forward -n ingress-nginx service/ingress-nginx-controller 10000:80 > /tmp/ingress-forward.log 2>&1 &
+
+# 4. Expose ArgoCD on port 9000 (optional — for GitOps dashboard)
+nohup kubectl port-forward svc/argocd-server -n argocd 9000:443 > /tmp/argocd-forward.log 2>&1 &
+```
+
+> **Tip:** Run all of these in one shot by pasting all commands together. They all run in the background via `nohup` so your terminal stays free.
+
+### Verifying Everything is Healthy
+
+```bash
+# Check all pods are Running
+kubectl get pods -n monitoring
+kubectl get pods -n churn-model
+kubectl get pods -n argocd
+
+# Quick prediction test
+curl -s -X POST http://127.0.0.1:5000/predict \
+  -H "Content-Type: application/json" \
+  -d '{"instances": [[45, 24, 79.99, 1920.00, 3]]}'
+# Expected: {"predictions": [1]}
+
+# Check metrics are being collected
+curl -s http://127.0.0.1:5000/metrics | grep churnshield_prediction_requests_total
+```
 
 ---
 

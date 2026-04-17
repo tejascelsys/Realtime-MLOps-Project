@@ -32,6 +32,10 @@ flowchart TD
     subgraph Monitoring["Monitoring (Namespace: monitoring)"]
       Prometheus("Prometheus Server")
       Grafana("Grafana Dashboards")
+      subgraph UIContainer["ChurnShield UI (Kubernetes Pod)"]
+        UIProxy("ui/server.py (Proxy + /metrics)")
+        PVC[("metrics-pvc (PersistentVolumeClaim)")]
+      end
     end
 
     subgraph ChurnModel["Namespace: churn-model"]
@@ -45,7 +49,7 @@ flowchart TD
     end
   end
 
-  Client("Client / Application UI")
+  Client("User Browser (port 5000)")
   Evidently("Evidently AI (ML Drift Reports)")
 
   %% Developer Workflow
@@ -65,15 +69,16 @@ flowchart TD
   Vol -.->|"10. mounted by"| Predictor
   
   %% Inference Flow & Routing
-  Client -->|"11. POST predict request"| Ingress
-  Ingress -->|"12. Routes traffic"| Knative
-  Knative -->|"13. Forwards to"| Predictor
+  Client -->|"11. POST /predict via port 5000"| UIProxy
+  UIProxy -->|"12. Forwards to KServe Ingress"| Ingress
+  Ingress -->|"13. Routes via Knative"| Predictor
+  UIProxy -.- PVC
 
   %% Monitoring Flow
-  Client -.->|"14. Exposes /metrics"| Prometheus
+  UIProxy -.->|"14. exposes /metrics"| Prometheus
   Prometheus -->|"15. Visualizes Metrics"| Grafana
-  Predictor -.->|"16. Baseline reference"| Evidently
-  Client -.->|"17. Production tracking"| Evidently
+  Predictor -.-|"16. Baseline reference"| Evidently
+  UIProxy -.-|"17. triggers monitor.py"| Evidently
 ```
 
 ## Component Breakdown & Workflow Steps
@@ -104,5 +109,14 @@ Whenever a developer commits changes to the repository:
 * **Step 12 & 13**: NGINX safely bridges over internal boundaries by routing traffic to the internal Knative local-gateway, which resolves internal services mapping to deliver your exact HTTP `POST` to the running Model Predictor pod.
 
 ### 6. Operations & ML Monitoring
-* **Step 14 & 15 (Ops Monitoring)**: The UI effectively serves as a proxy application that exposes inference latencies, requests, and errors via a `/metrics` Prometheus endpoint. A clustered Prometheus configuration scrapes this data continuously to visualize in Grafana.
-* **Step 16 & 17 (ML Monitoring)**: Model predictions on real-world simulated client data is tracked seamlessly against the model's fixed baseline (`.csv` reference via DVC), enabling Evidently AI interactive reports that detect data and prediction drift.
+* **Step 14 (Ops Monitoring)**: The UI proxy pod exposes a `/metrics` Prometheus endpoint. A Prometheus server running in the same namespace scrapes this endpoint to visualize prediction counts, latency, and error distributions in Grafana.
+* **Step 17 (ML Monitoring)**: The UI exposes a `/run-monitoring` endpoint that triggers `monitoring/monitor.py` inside the container using Evidently AI. It compares the production distribution versus the baseline `data/churn_data.csv` and generates interactive HTML drift reports viewable at `/monitoring`.
+
+### 7. ChurnShield UI (Containerized Frontend)
+
+The ChurnShield UI (`ui/server.py`) is **not run as a local process**. It is fully containerized and deployed as a Kubernetes pod:
+
+* **Docker Image** (`ui/Dockerfile.ui`): Packages the proxy server, the Evidently monitoring scripts, and all required data (including `data/`, `models/`, and `params.yaml`) into a single `python:3.11-slim` image with pinned dependencies (`evidently==0.4.9`, `pandas==2.1.4`, `pydantic==1.10.12`).
+* **Kubernetes Deployment** (`k8s/ui.yaml`): Deploys the image as a `Deployment` in the `monitoring` namespace. Resource limits (`1 CPU`, `512Mi`) are defined to keep it stable on a local KIND cluster.
+* **Persistent Metrics** (`metrics-pvc`): A `PersistentVolumeClaim` (1Gi, `ReadWriteOnce`) is mounted at `/tmp/prometheus_metrics`. This ensures Prometheus counters survive pod restarts, rollouts, and redeployments — so Grafana data is never lost.
+* **Access Pattern**: The pod runs at `ClusterIP` (internal). Access from your laptop browser is done via `kubectl port-forward --address 0.0.0.0 -n monitoring svc/churnshield-ui 5000:5000`, binding it on all interfaces so the custom domain `churnshield.mlops-demo.labs.csi-infra.com:5000` resolves correctly.
