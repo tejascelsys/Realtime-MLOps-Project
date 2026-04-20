@@ -43,6 +43,10 @@ jobs:
         dvc remote modify myremote connection_string "$AZURE_STORAGE_CONNECTION_STRING"
         dvc pull || echo "No cache yet"
         dvc repro
+        
+        # Evaluate model performance before pushing
+        python scripts/evaluate_metrics.py 5.0
+        
         dvc push
         
         # Check if dvc.lock changed
