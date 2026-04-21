@@ -20,13 +20,15 @@ data = {
     'num_support_calls': np.random.randint(0, 10, n_samples),
 }
 
-# Simple churn logic: higher charges + more support calls = more churn
-churn_prob = (
-    (data['monthly_charges'] / 120) * 0.3 +
+# Stronger, more deterministic logic for high-accuracy demo purposes
+score = (
+    (data['monthly_charges'] / 120) * 0.4 +
     (data['num_support_calls'] / 10) * 0.4 +
-    (1 - data['tenure_months'] / 72) * 0.3
+    (1 - data['tenure_months'] / 72) * 0.2
 )
-data['churn'] = (np.random.random(n_samples) < churn_prob).astype(int)
+
+# Use 0.05 noise instead of complete randomness for the final threshold cutoff
+data['churn'] = (score + np.random.normal(0, 0.05, n_samples) > 0.5).astype(int)
 
 df = pd.DataFrame(data)
 df.to_csv('data/churn_data.csv', index=False)

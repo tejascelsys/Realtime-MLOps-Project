@@ -5,8 +5,8 @@ stages:
     deps:
     - path: generate_data.py
       hash: md5
-      md5: cc9015a6155c51b4f2633a4da315829e
-      size: 1062
+      md5: 9686c7174fcd5f9d7e0339fc8fba4d44
+      size: 1145
     params:
       params.yaml:
         data.n_samples: 2000
@@ -14,14 +14,14 @@ stages:
     outs:
     - path: data/churn_data.csv
       hash: md5
-      md5: 66065deea18c5fcbc531841be7383e16
+      md5: bb9bdfd1a4f6a0029b2fcbc4f76a3c3c
       size: 101778
   train:
     cmd: python train.py
     deps:
     - path: data/churn_data.csv
       hash: md5
-      md5: 66065deea18c5fcbc531841be7383e16
+      md5: bb9bdfd1a4f6a0029b2fcbc4f76a3c3c
       size: 101778
     - path: train.py
       hash: md5
@@ -35,9 +35,9 @@ stages:
     outs:
     - path: metrics.json
       hash: md5
-      md5: a44b628a787fa01cb50a880598fbecc8
+      md5: 52fe90406beba3eee7800f9f86737db8
       size: 57
     - path: models/churn_model.pkl
       hash: md5
-      md5: c241fa66b91ef67f89ee14780bd214b5
-      size: 29173845
+      md5: 806d1588d410bb15f75ffb47f740d006
+      size: 12621455
