@@ -230,10 +230,11 @@ git push origin main
 
 The pipeline runs automatically on push to `main`. It achieves "Invisible MLOps":
 1. Triggers DVC pipeline dynamically reading from Azure Connection Strings
-2. Uploads updated DVC storage chunks safely (Hashes logic)
-3. Uploads raw .pkl securely directly to the Azure KServe path using Git SHAs
-4. Updates `k8s/inference.yaml` storageUri securely via Python `update_yaml.py`
-5. Commits `dvc.lock`, `metrics.json` and the YAML updates back automatically.
+2. **Automated Pre-Deployment Rollback**: Evaluates new model metrics (`metrics.json`) against the previous commit. If performance drops by >5%, the pipeline fails instantly, aborting the rollout to protect production.
+3. Uploads updated DVC storage chunks safely (Hashes logic)
+4. Uploads raw .pkl securely directly to the Azure KServe path using Git SHAs
+5. Updates `k8s/inference.yaml` storageUri securely via Python `update_yaml.py`
+6. Commits `dvc.lock`, `metrics.json` and the YAML updates back automatically.
 
 ### 4. Kubernetes with KIND & KServe
 
@@ -338,7 +339,7 @@ Because browsers block cross-origin requests (CORS), the frontend uses a lightwe
 3. Exposes a `/metrics` endpoint for Prometheus scraping
 4. Runs `monitoring/monitor.py` and `monitoring/simulate_drift.py` on-demand via API
 
-> **Architecture Note:** The UI proxy server (`ui/server.py`) is **no longer run locally**. It is packaged as a Docker container (`ui/Dockerfile.ui`) and deployed as a Kubernetes `Deployment` in the `monitoring` namespace via `k8s/ui.yaml`. This ensures the UI is always running, automatically restarts on failure, and metrics persist across restarts using a `PersistentVolumeClaim`.
+> **Architecture Note**: The UI proxy server (`ui/server.py`) is deployed as a Kubernetes `Deployment` (`k8s/ui.yaml`). It is backed by a **Horizontal Pod Autoscaler (HPA)** that scales replicas up to 3 during traffic spikes (CPU > 70%), ensuring high availability. Metrics persist across restarts via `PersistentVolumeClaim`.
 
 ### Initial Deployment (First Time Only)
 
@@ -443,11 +444,18 @@ The pre-built dashboard (`grafana-dashboard-churnshield` ConfigMap in `grafana.y
 # Deploy Prometheus and Grafana
 kubectl apply -f k8s/monitoring/
 
-# Port-forward Grafana
+# Port-forward Grafana and Prometheus
 nohup kubectl port-forward -n monitoring svc/grafana 3000:3000 > /tmp/grafana-forward.log 2>&1 &
+nohup kubectl port-forward -n monitoring svc/prometheus 9090:9090 > /tmp/prometheus-forward.log 2>&1 &
 ```
 - **Access Grafana**: `http://localhost:3000` (Login: `admin` / `admin`)
-- The ChurnShield dashboard loads as the **home dashboard** automatically.
+- **Access Alerts**: `http://localhost:9090/alerts`
+
+#### Prometheus Alerting Rules
+The `prometheus.yaml` config includes built-in alerting rules to detect degradation before it impacts users. You can view their status at the Prometheus URL above.
+* **`InstanceDown`**: Fires if the UI proxy pod fails to respond to scrapes for 1 minute (Critical).
+* **`HighErrorRate`**: Fires if >5% of inference requests fail over a 1-minute window (Warning).
+* **`HighLatency`**: Fires if the 99th percentile (p99) latency exceeds 2 seconds for 2 continuous minutes (Warning).
 
 > **Metrics Persistence:** Prometheus metric data is stored on a `prometheus-storage-pvc` (5Gi PVC). Grafana dashboards and settings are stored on `grafana-storage-pvc` (2Gi PVC). Both survive pod restarts.
 
@@ -591,10 +599,13 @@ nohup kubectl port-forward --address 0.0.0.0 -n monitoring svc/churnshield-ui 50
 # 2. Expose Grafana on port 3000 (optional — for monitoring dashboard)
 nohup kubectl port-forward -n monitoring svc/grafana 3000:3000 > /tmp/grafana-forward.log 2>&1 &
 
-# 3. Expose Ingress on port 10000 (optional — for direct KServe curl testing)
+# 3. Expose Prometheus on port 9090 (optional — for viewing Active Alerts)
+nohup kubectl port-forward -n monitoring svc/prometheus 9090:9090 > /tmp/prometheus-forward.log 2>&1 &
+
+# 4. Expose Ingress on port 10000 (optional — for direct KServe curl testing)
 nohup kubectl port-forward -n ingress-nginx service/ingress-nginx-controller 10000:80 > /tmp/ingress-forward.log 2>&1 &
 
-# 4. Expose ArgoCD on port 9000 (optional — for GitOps dashboard)
+# 5. Expose ArgoCD on port 9000 (optional — for GitOps dashboard)
 nohup kubectl port-forward svc/argocd-server -n argocd 9000:443 > /tmp/argocd-forward.log 2>&1 &
 ```
 
