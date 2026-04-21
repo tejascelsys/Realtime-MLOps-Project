@@ -3,6 +3,6 @@ data:
   random_seed: 45
 
 train:
-  n_estimators: 350
+  n_estimators: 500
   test_size: 0.2
   random_state: 42
