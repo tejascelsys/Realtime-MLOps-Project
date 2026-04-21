@@ -1,6 +1,6 @@
 data:
-  n_samples: 1000
-  random_seed: 42
+  n_samples: 2000
+  random_seed: 45
 
 train:
   n_estimators: 350
