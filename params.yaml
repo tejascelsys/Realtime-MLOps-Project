@@ -1,5 +1,5 @@
 data:
-  n_samples: 2000
+  n_samples: 1200
   random_seed: 45
 
 train:
