@@ -45,38 +45,4 @@ metrics = {"accuracy": accuracy, "auc_roc": auc}
 with open('metrics.json', 'w') as f:
     json.dump(metrics, f, indent=2)
 print("Metrics saved to metrics.json")
-
-# MLflow Tracking
-import os
-import mlflow
-import mlflow.sklearn
-
-try:
-    # Use K8s MLflow server if available; fallback to local mlruns/
-    tracking_uri = os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5001")
-    mlflow.set_tracking_uri(tracking_uri)
-    mlflow.set_experiment("churn-predictor")
-
-    with mlflow.start_run():
-        # Log all params
-        mlflow.log_params({
-            "n_samples": params['data']['n_samples'],
-            "random_seed": params['data']['random_seed'],
-            "n_estimators": params['train']['n_estimators'],
-            "test_size": params['train']['test_size'],
-            "random_state": params['train']['random_state']
-        })
-        
-        # Log metrics
-        mlflow.log_metrics({
-            "accuracy": accuracy,
-            "auc_roc": auc
-        })
-        
-        # Log model
-        mlflow.sklearn.log_model(model, "model")
-        print(f"MLflow tracking successful. Logged to {tracking_uri}")
-except Exception as e:
-    print(f"⚠️ MLflow tracking skipped or failed: {str(e)}")
-
 # Triggered: Thu Mar 27 11:00:52 AM IST 2026
