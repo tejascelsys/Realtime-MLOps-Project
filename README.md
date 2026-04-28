@@ -531,6 +531,23 @@ The ChurnShield UI at `http://localhost:5000/monitoring` embeds all 3 HTML repor
 
 ---
 
+## 🔬 MLflow Experiment Tracking
+
+The project includes an **MLflow Tracking Server** to record every training experiment, its hyperparameters, resulting metrics, and the model artifact itself.
+
+### Accessing the MLflow UI
+The MLflow server runs in the `monitoring` namespace. Access it by port-forwarding:
+
+```bash
+nohup kubectl port-forward -n monitoring svc/mlflow 5001:5001 > /tmp/mlflow-forward.log 2>&1 &
+```
+
+Then open `http://localhost:5001` in your browser.
+
+- **Automated Logging**: `train.py` automatically logs `n_samples`, `n_estimators`, `accuracy`, and `auc_roc` to the server without any manual intervention.
+- **Persistence**: Experiment data and model artifacts are stored on a persistent volume (`mlflow-storage-pvc`) so history survives pod restarts.
+
+
 ## 🔁 Complete MLOps Workflow Trace
 
 - [ ] **Developer** pushes code/parameters to GitHub (main branch)

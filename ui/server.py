@@ -73,6 +73,16 @@ if PROMETHEUS_AVAILABLE:
     )
     MODEL_INFO.labels(model_type="RandomForest", features="5").set(1)
 
+    MODEL_ACCURACY = Gauge(
+        "churnshield_model_accuracy",
+        "Accuracy of the currently deployed model",
+    )
+    MODEL_AUC_ROC = Gauge(
+        "churnshield_model_auc_roc",
+        "AUC-ROC of the currently deployed model",
+    )
+
+
 
 KSERVE_ENDPOINT = os.getenv(
     "KSERVE_ENDPOINT",
@@ -318,6 +328,16 @@ class ProxyHandler(SimpleHTTPRequestHandler):
         if not PROMETHEUS_AVAILABLE:
             self._send_json(503, {"error": "prometheus_client not installed"})
             return
+            
+        try:
+            if METRICS_PATH.exists():
+                with open(METRICS_PATH, "r") as f:
+                    data = json.load(f)
+                    MODEL_ACCURACY.set(data.get("accuracy", 0.0))
+                    MODEL_AUC_ROC.set(data.get("auc_roc", 0.0))
+        except Exception as e:
+            print(f"⚠️ Failed to update model metrics gauges: {e}")
+            
         output = generate_latest(_registry)
         self.send_response(200)
         self.send_header("Content-Type", CONTENT_TYPE_LATEST)

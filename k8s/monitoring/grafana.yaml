@@ -286,6 +286,35 @@ data:
               "refId": "A"
             }
           ]
+        },
+        {
+          "title": "📊 Model Accuracy Over Time",
+          "type": "gauge",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 22 },
+          "datasource": { "type": "prometheus", "uid": "prom-datasource" },
+          "fieldConfig": {
+            "defaults": {
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "#ff4d6d", "value": null },
+                  { "color": "#f59e0b", "value": 0.7 },
+                  { "color": "#00d4a8", "value": 0.85 }
+                ]
+              },
+              "min": 0,
+              "max": 1,
+              "unit": "percentunit"
+            }
+          },
+          "targets": [
+            {
+              "expr": "churnshield_model_accuracy",
+              "legendFormat": "Accuracy",
+              "refId": "A"
+            }
+          ]
         }
       ],
       "schemaVersion": 39,
