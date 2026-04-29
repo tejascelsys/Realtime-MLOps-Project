@@ -1,8 +1,8 @@
 data:
-  n_samples: 2000
+  n_samples: 2005
   random_seed: 43
 
 train:
-  n_estimators: 450
+  n_estimators: 500
   test_size: 0.2
   random_state: 42

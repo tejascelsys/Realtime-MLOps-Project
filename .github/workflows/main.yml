@@ -45,7 +45,7 @@ jobs:
         dvc repro
         
         # Evaluate model performance before pushing
-        python scripts/evaluate_metrics.py 50.0
+        python scripts/evaluate_metrics.py 5.0
         
         dvc push
         
